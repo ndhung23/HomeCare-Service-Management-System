@@ -397,14 +397,17 @@ const HelpersPage = () => {
             {/* ============ RIGHT: DANH SÁCH NGƯỜI GIÚP VIỆC ============ */}
             <div className="lg:col-span-10">
               {/* Thanh công cụ: số kết quả + nút bộ lọc (mobile) + sắp xếp */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5 bg-white rounded-2xl border border-slate-100 shadow-xs px-4 py-3">
+              <div
+                ref={listTopRef}
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5 bg-white rounded-2xl border border-slate-100 shadow-xs px-4 py-3"
+              >
                 <div>
                   <h2 className="text-base font-extrabold text-slate-900">
                     Người giúp việc hiện có trong hệ thống
                   </h2>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Hiển thị <span className="font-bold text-blue-600">{filteredHelpers.length}</span> trên
-                    tổng {helpersList.length} người giúp việc
+                    Tìm thấy <span className="font-bold text-blue-600">{filteredHelpers.length}</span> người phù
+                    hợp trên tổng {helpersList.length} người giúp việc
                     {activeFilterCount > 0 && (
                       <> • Đang áp dụng <span className="font-bold">{activeFilterCount}</span> bộ lọc</>
                     )}
@@ -465,7 +468,7 @@ const HelpersPage = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {filteredHelpers.map((helper) => {
+                  {paginatedHelpers.map((helper) => {
                     const isFav = favorites[helper.id];
                     return (
                       <article key={helper.id} className="helper-card flex flex-col justify-between">
@@ -569,6 +572,15 @@ const HelpersPage = () => {
                   })}
                 </div>
               )}
+
+              {/* Phân trang: 9 người giúp việc / trang */}
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                totalItems={filteredHelpers.length}
+                itemLabel="người giúp việc"
+                onPageChange={handlePageChange}
+              />
             </div>
           </div>
         </section>
