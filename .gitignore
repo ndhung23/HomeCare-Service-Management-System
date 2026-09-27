@@ -1,5 +1,28 @@
+# Dependencies
 node_modules/
+*/node_modules/
+
+# Environment Variables
 .env
-.DS_Store
+*.env
+backend/.env
+frontend/.env
+
+# Build & Logs
 dist/
 build/
+*.log
+npm-debug.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# AI Agents & IDE Cache
+.agentkit/
+.agents/
+.claude/
+.sdd/
+.agentignore
+*.md
+!README.md
