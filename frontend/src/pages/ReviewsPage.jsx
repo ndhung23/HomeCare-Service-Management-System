@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
 import BenefitsBanner from '../components/BenefitsBanner';
+import Footer from '../components/Footer';
 import { 
   Star, 
   CheckCircle2, 
@@ -191,6 +192,8 @@ const ReviewsPage = () => {
 
         <BenefitsBanner />
       </main>
+
+      <Footer />
     </div>
   );
 };

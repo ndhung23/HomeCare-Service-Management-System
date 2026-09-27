@@ -1,6 +1,7 @@
 import React from 'react';
 import Navbar from '../components/Navbar';
 import BenefitsBanner from '../components/BenefitsBanner';
+import Footer from '../components/Footer';
 import { 
   ShieldCheck, 
   Heart, 
@@ -137,6 +138,8 @@ const AboutPage = () => {
 
         <BenefitsBanner />
       </main>
+
+      <Footer />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Home from './pages/Home';
 import ServicesPage from './pages/ServicesPage';
+import HelpersPage from './pages/HelpersPage';
 import AboutPage from './pages/AboutPage';
 import ReviewsPage from './pages/ReviewsPage';
 import NewsPage from './pages/NewsPage';
@@ -29,6 +30,7 @@ function App() {
           {/* Main Website Navigation Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/services" element={<ServicesPage />} />
+          <Route path="/helpers" element={<HelpersPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="/news" element={<NewsPage />} />

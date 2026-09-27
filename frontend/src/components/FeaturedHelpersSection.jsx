@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Star, Heart, CheckCircle2, ChevronRight } from 'lucide-react';
 
 const helpers = [
@@ -78,13 +79,13 @@ const FeaturedHelpersSection = ({ onOpenBooking }) => {
           </div>
 
           <div>
-            <a 
-              href="#more" 
+            <Link
+              to="/helpers"
               className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full border border-slate-300 text-sm font-medium text-slate-700 hover:border-blue-600 hover:text-blue-600 transition-all bg-white hover:bg-blue-50/50"
             >
               <span>Xem thêm người giúp việc</span>
               <ChevronRight className="w-4 h-4" />
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -95,11 +96,12 @@ const FeaturedHelpersSection = ({ onOpenBooking }) => {
             return (
               <div key={helper.id} className="helper-card flex flex-col justify-between">
                 
-                {/* Image Header with Heart button */}
-                <div className="relative h-48 bg-slate-100 overflow-hidden">
+                {/* Image Header with Heart button - full khung dọc 4:5 */}
+                <div className="relative aspect-[4/5] w-full bg-slate-100 overflow-hidden">
                   <img
                     src={helper.avatar}
                     alt={helper.name}
+                    loading="lazy"
                     className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
                   />
                   

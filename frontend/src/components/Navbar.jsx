@@ -47,6 +47,12 @@ const Navbar = () => {
               Dịch vụ
             </Link>
             <Link 
+              to="/helpers" 
+              className={`gv-nav-link ${location.pathname === '/helpers' ? 'active' : ''}`}
+            >
+              Nhân viên
+            </Link>
+            <Link 
               to="/about" 
               className={`gv-nav-link ${location.pathname === '/about' ? 'active' : ''}`}
             >

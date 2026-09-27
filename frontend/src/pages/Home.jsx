@@ -5,6 +5,7 @@ import ServicesSection from '../components/ServicesSection';
 import FeaturedHelpersSection from '../components/FeaturedHelpersSection';
 import BenefitsBanner from '../components/BenefitsBanner';
 import BookingModal from '../components/BookingModal';
+import Footer from '../components/Footer';
 import '../styles/Home.css';
 
 const Home = () => {
@@ -25,6 +26,8 @@ const Home = () => {
         <FeaturedHelpersSection onOpenBooking={handleOpenBooking} />
         <BenefitsBanner />
       </main>
+
+      <Footer />
 
       {/* Booking flow modal for customers */}
       <BookingModal

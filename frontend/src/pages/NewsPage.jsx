@@ -1,6 +1,7 @@
 import React from 'react';
 import Navbar from '../components/Navbar';
 import BenefitsBanner from '../components/BenefitsBanner';
+import Footer from '../components/Footer';
 import { Calendar, Clock, ArrowRight } from 'lucide-react';
 import '../styles/Home.css';
 
@@ -118,6 +119,8 @@ const NewsPage = () => {
 
         <BenefitsBanner />
       </main>
+
+      <Footer />
     </div>
   );
 };
