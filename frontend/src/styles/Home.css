@@ -1,0 +1,195 @@
+/* Custom CSS riêng cho trang Home - GiúpViệc24 */
+
+.gv-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.gv-nav-link {
+  position: relative;
+  font-weight: 500;
+  color: #475569;
+  transition: all 0.2s ease;
+  padding: 0.5rem 0.25rem;
+}
+
+.gv-nav-link:hover {
+  color: #2563eb;
+}
+
+.gv-nav-link.active {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.gv-nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #2563eb;
+  border-radius: 9999px;
+}
+
+/* Handwriting Quotes */
+.handwriting-quote {
+  font-family: 'Caveat', cursive;
+  font-size: 1.65rem;
+  line-height: 1.25;
+  color: #334155;
+  letter-spacing: -0.01em;
+  transform: rotate(-3deg);
+  display: inline-block;
+  user-select: none;
+}
+
+.handwriting-quote-footer {
+  font-family: 'Caveat', cursive;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  color: #1e293b;
+  transform: rotate(-2deg);
+}
+
+/* Hero Badge */
+.hero-trust-badge {
+  background-color: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #2563eb;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  padding: 0.4rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.05);
+}
+
+/* Search Box Container */
+.search-widget {
+  background: #ffffff;
+  border-radius: 1.25rem;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+  border: 1px solid #f1f5f9;
+  padding: 0.75rem 1rem;
+  transition: box-shadow 0.25s ease;
+}
+
+.search-widget:focus-within {
+  box-shadow: 0 14px 34px -4px rgba(37, 99, 235, 0.12), 0 6px 12px -2px rgba(0, 0, 0, 0.04);
+}
+
+.search-field-divider {
+  width: 1px;
+  background: #e2e8f0;
+  height: 38px;
+  margin: 0 0.75rem;
+}
+
+/* Service Card Styles */
+.service-item-card {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid #f1f5f9;
+  background-color: #ffffff;
+}
+
+.service-item-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.06);
+  border-color: #e2e8f0;
+}
+
+.service-icon-wrapper {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.85rem;
+  transition: transform 0.25s ease;
+}
+
+.service-item-card:hover .service-icon-wrapper {
+  transform: scale(1.08);
+}
+
+/* Helper Profile Card */
+.helper-card {
+  background: #ffffff;
+  border-radius: 1.25rem;
+  border: 1px solid #f1f5f9;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s ease;
+}
+
+.helper-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 16px 28px -6px rgba(0, 0, 0, 0.1);
+  border-color: #cbd5e1;
+}
+
+.helper-verified-pill {
+  background-color: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  padding: 0.2rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.skill-tag {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  display: inline-block;
+}
+
+.btn-book {
+  background-color: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 0.625rem;
+  padding: 0.45rem 1rem;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.btn-book:hover {
+  background-color: #1d4ed8;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+}
+
+/* Quality Assurance Banner */
+.guarantee-banner {
+  background-color: #f0f7ff;
+  border: 1px solid #e0eeff;
+  border-radius: 1.25rem;
+}
+
+.guarantee-item-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.1);
+}

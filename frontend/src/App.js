@@ -1,40 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import './App.css';
-import axiosClient from './api/axiosClient';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Home from './pages/Home';
+import ServicesPage from './pages/ServicesPage';
+import AboutPage from './pages/AboutPage';
+import ReviewsPage from './pages/ReviewsPage';
+import NewsPage from './pages/NewsPage';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import EnterpriseDashboard from './pages/enterprise/EnterpriseDashboard';
+import HelperProfile from './pages/helper/HelperProfile';
+import CustomerProfile from './pages/customer/CustomerProfile';
+import './index.css';
+
+// Dynamic /profile redirector based on logged-in role
+const ProfileRedirect = () => {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  return <Navigate to={user.dashboardPath || '/customer'} replace />;
+};
 
 function App() {
-  const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    // Gọi thử nghiệm API test từ backend
-    const fetchApiTest = async () => {
-      try {
-        const response = await axiosClient.get('/test');
-        setMessage(response.data.message);
-      } catch (err) {
-        console.error('Lỗi khi gọi API:', err);
-        setError(err.message || 'Không thể kết nối đến máy chủ backend');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchApiTest();
-  }, []);
-
   return (
-    <div className="App" style={{ textAlign: 'center', marginTop: '50px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>MERN Stack Starter</h1>
-      
-      <div style={{ marginTop: '20px', padding: '15px', border: '1px solid #ccc', display: 'inline-block', borderRadius: '8px' }}>
-        <h3>Trạng thái kết nối Backend:</h3>
-        {loading && <p>Đang tải dữ liệu từ API...</p>}
-        {error && <p style={{ color: 'red' }}>Lỗi: {error}</p>}
-        {message && <p style={{ color: 'green', fontWeight: 'bold' }}>{message}</p>}
-      </div>
-    </div>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Main Website Navigation Routes */}
+          <Route path="/" element={<Home />} />
+          <Route path="/services" element={<ServicesPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/reviews" element={<ReviewsPage />} />
+          <Route path="/news" element={<NewsPage />} />
+
+          {/* Auth Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* Role specific routes */}
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/enterprise" element={<EnterpriseDashboard />} />
+          <Route path="/helper" element={<HelperProfile />} />
+          <Route path="/customer" element={<CustomerProfile />} />
+          
+          {/* General profile route redirects to user's role dashboard */}
+          <Route path="/profile" element={<ProfileRedirect />} />
+          
+          {/* Catch-all redirect to Home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 
