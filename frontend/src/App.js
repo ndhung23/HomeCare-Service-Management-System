@@ -13,6 +13,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import EnterpriseDashboard from './pages/enterprise/EnterpriseDashboard';
 import HelperProfile from './pages/helper/HelperProfile';
 import CustomerProfile from './pages/customer/CustomerProfile';
+import BookingPage from './pages/BookingPage';
 import './index.css';
 
 // Dynamic /profile redirector based on logged-in role
@@ -30,6 +31,7 @@ function App() {
           {/* Main Website Navigation Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/services" element={<ServicesPage />} />
+          <Route path="/services/:id/book" element={<BookingPage />} />
           <Route path="/helpers" element={<HelpersPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/reviews" element={<ReviewsPage />} />

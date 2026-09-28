@@ -1,57 +1,42 @@
 import React from 'react';
-import { 
-  Sparkles, 
-  UtensilsCrossed, 
-  Baby, 
-  UserCheck, 
-  Shirt, 
-  ShieldCheck 
+import {
+  Sparkles,
+  SprayCan,
+  PartyPopper,
+  UtensilsCrossed,
+  Baby,
+  UserCheck,
+  Shirt,
+  ShieldCheck,
+  AirVent,
+  Building2,
 } from 'lucide-react';
+import { mockServices } from '../mock/servicesData';
 
-const services = [
-  {
-    id: 1,
-    title: 'Dọn dẹp nhà',
-    subtitle: 'Nhà cửa luôn sạch sẽ',
-    bgCircle: 'bg-blue-50 text-blue-600 border border-blue-100',
-    icon: Sparkles,
-  },
-  {
-    id: 2,
-    title: 'Nấu ăn',
-    subtitle: 'Bữa ăn ngon, dinh dưỡng',
-    bgCircle: 'bg-amber-50 text-amber-600 border border-amber-100',
-    icon: UtensilsCrossed,
-  },
-  {
-    id: 3,
-    title: 'Chăm sóc trẻ',
-    subtitle: 'An toàn, tận tâm',
-    bgCircle: 'bg-rose-50 text-rose-500 border border-rose-100',
-    icon: Baby,
-  },
-  {
-    id: 4,
-    title: 'Chăm sóc người già',
-    subtitle: 'Chu đáo, chuyên nghiệp',
-    bgCircle: 'bg-emerald-50 text-emerald-600 border border-emerald-100',
-    icon: UserCheck,
-  },
-  {
-    id: 5,
-    title: 'Giặt ủi, phơi đồ',
-    subtitle: 'Tiện lợi, nhanh chóng',
-    bgCircle: 'bg-purple-50 text-purple-600 border border-purple-100',
-    icon: Shirt,
-  },
-  {
-    id: 6,
-    title: 'Giúp việc theo giờ',
-    subtitle: 'Linh hoạt thời gian',
-    bgCircle: 'bg-cyan-50 text-cyan-600 border border-cyan-100',
-    icon: ShieldCheck,
-  },
-];
+/* Map iconKey trong mock data -> icon component của lucide */
+const ICON_MAP = {
+  Sparkles,
+  SprayCan,
+  PartyPopper,
+  UtensilsCrossed,
+  Shirt,
+  Baby,
+  UserCheck,
+  AirVent,
+  Building2,
+  ShieldCheck,
+};
+
+/* 6 dịch vụ tiêu biểu hiển thị ở lưới danh mục trang chủ */
+const services = mockServices.slice(0, 6).map((service) => ({
+  id: service.id,
+  serviceId: service.id,
+  serviceCode: service.serviceCode,
+  title: service.title,
+  subtitle: service.subtitle,
+  bgCircle: service.themeClass,
+  icon: ICON_MAP[service.iconKey] || Sparkles,
+}));
 
 const ServicesSection = ({ onOpenBooking }) => {
   return (
@@ -63,7 +48,7 @@ const ServicesSection = ({ onOpenBooking }) => {
             return (
               <div
                 key={item.id}
-                onClick={() => onOpenBooking && onOpenBooking({ service: item.title })}
+                onClick={() => onOpenBooking && onOpenBooking({ serviceId: item.serviceId, service: item.title })}
                 className="service-item-card p-6 rounded-2xl text-center cursor-pointer group"
               >
                 <div className={`service-icon-wrapper ${item.bgCircle}`}>

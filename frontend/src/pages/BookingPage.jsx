@@ -1,23 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import { 
-  X, 
   Calendar, 
   Clock, 
   MapPin, 
   CheckCircle2, 
   Sparkles, 
   ShieldCheck,
-  User,
   ArrowRight,
   ChevronDown,
   Info,
   Check,
-  Users
+  Users,
+  ArrowLeft
 } from 'lucide-react';
 import {
-  resolveService,
+  mockServices,
+  getServiceById,
   mockWorkers,
   buildDefaultDynamicAttributes,
   computePricing,
@@ -26,12 +28,19 @@ import {
   PRICING_TYPES
 } from '../mock/servicesData';
 
-const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
+const BookingPage = () => {
+  const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const { user, addBooking } = useAuth();
   const navigate = useNavigate();
 
-  // Xác định dịch vụ hiện tại dựa trên initialData
-  const activeService = useMemo(() => resolveService(initialData), [initialData]);
+  // Xác định dịch vụ hiện tại dựa trên id từ URL param
+  const activeService = useMemo(() => {
+    return getServiceById(id) || mockServices[0];
+  }, [id]);
+
+  const initialHelperParam = searchParams.get('helper') || searchParams.get('helperName');
+  const initialAddressParam = searchParams.get('address');
 
   // Các state form cơ bản
   const [workerOption, setWorkerOption] = useState('AUTO'); // 'AUTO' | 'SPECIFIC'
@@ -40,7 +49,7 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
   const [workDate, setWorkDate] = useState('2026-09-28');
   const [startTime, setStartTime] = useState('14:00');
   const [fullAddress, setFullAddress] = useState(
-    'Căn hộ 1204, Vinhomes D’Capitale, Trần Duy Hưng, Hà Nội'
+    initialAddressParam || 'Căn hộ 1204, Vinhomes D’Capitale, Trần Duy Hưng, Hà Nội'
   );
   const [customerNotes, setCustomerNotes] = useState('');
   const [dynamicAttributes, setDynamicAttributes] = useState({});
@@ -49,9 +58,10 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdBooking, setCreatedBooking] = useState(null);
 
-  // Khởi tạo/đồng bộ state khi initialData hoặc activeService thay đổi
+  // Khởi tạo/đồng bộ state khi activeService hoặc params thay đổi
   useEffect(() => {
-    if (!isOpen) return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!activeService) return;
 
     // Reset dynamicAttributes theo config của dịch vụ đang chọn
     const defaultDynamic = buildDefaultDynamicAttributes(activeService);
@@ -65,19 +75,22 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
     setDurationHours(initialH);
 
     // Người thực hiện
-    if (initialData.helperName && initialData.helperName !== 'Người giúp việc phù hợp nhất') {
+    if (initialHelperParam && initialHelperParam !== 'Người giúp việc phù hợp nhất') {
       setWorkerOption('SPECIFIC');
-      const matched = mockWorkers.find((w) => w.name === initialData.helperName);
+      const matched = mockWorkers.find((w) => 
+        w.name.toLowerCase() === initialHelperParam.toLowerCase() ||
+        w.id.toLowerCase() === initialHelperParam.toLowerCase()
+      );
       setSelectedWorkerId(matched?.id || mockWorkers[0]?.id || '');
     } else {
       setWorkerOption('AUTO');
       setSelectedWorkerId('');
     }
 
-    if (initialData.address) {
-      setFullAddress(initialData.address);
+    if (initialAddressParam) {
+      setFullAddress(initialAddressParam);
     }
-  }, [isOpen, initialData, activeService]);
+  }, [activeService, initialHelperParam, initialAddressParam]);
 
   // Tính toán chi phí real-time
   const calculationSummary = useMemo(() => {
@@ -87,15 +100,13 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
     });
   }, [activeService, durationHours, dynamicAttributes]);
 
-  if (!isOpen) return null;
-
   // Lấy tên người thực hiện hiển thị
   const chosenWorker = mockWorkers.find((w) => w.id === selectedWorkerId);
   const helperDisplayName =
     workerOption === 'SPECIFIC' && chosenWorker
       ? chosenWorker.name
-      : initialData.helperName && initialData.helperName !== 'Người giúp việc phù hợp nhất'
-      ? initialData.helperName
+      : initialHelperParam && initialHelperParam !== 'Người giúp việc phù hợp nhất'
+      ? initialHelperParam
       : 'Người giúp việc phù hợp nhất';
 
   // Handler cập nhật dynamic attributes
@@ -173,11 +184,7 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
     const newBooking = addBooking(bookingPayload);
     setCreatedBooking(newBooking);
     setIsSuccess(true);
-  };
-
-  const handleClose = () => {
-    setIsSuccess(false);
-    onClose();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Cấu hình các trường động
@@ -187,49 +194,42 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
   const stepHours = pricingConfig.stepHours || [2, 3, 4, 6];
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="relative bg-white w-full max-w-xl rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-8">
-        
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="font-extrabold text-slate-900 text-base">
-                {isSuccess ? 'Đặt lịch thành công!' : 'Đặt dịch vụ'}
-              </h3>
-              <p className="text-[11px] text-slate-400">Dịch vụ uy tín • Cam kết chất lượng</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+      <Navbar />
+
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        {/* Navigation Breadcrumb */}
+        <div className="mb-6 flex items-center justify-between">
+          <Link
+            to="/services"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-500 hover:text-blue-600 transition-colors"
           >
-            <X className="w-5 h-5" />
-          </button>
+            <ArrowLeft className="w-4 h-4" />
+            <span>Quay lại danh sách dịch vụ</span>
+          </Link>
+          <div className="text-xs text-slate-400">
+            Mã dịch vụ: <strong className="text-slate-700">{activeService?.id}</strong>
+          </div>
         </div>
 
         {/* Modal Body */}
         {isSuccess ? (
           /* Success Screen */
-          <div className="p-6 sm:p-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-100 shadow-xs">
-              <CheckCircle2 className="w-9 h-9" />
+          <div className="max-w-2xl mx-auto bg-white rounded-3xl p-8 sm:p-12 shadow-xl border border-slate-100 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-20 h-20 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-100 shadow-xs">
+              <CheckCircle2 className="w-12 h-12" />
             </div>
-            <h4 className="text-xl font-black text-slate-900 mb-1">
-              Đã nhận yêu cầu đặt lịch!
-            </h4>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto mb-6">
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-2">
+              Đặt lịch dịch vụ thành công!
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mb-6">
               Mã đơn: <strong className="text-blue-600 font-bold">{createdBooking?.id}</strong>. 
               {workerOption === 'SPECIFIC'
                 ? ` Nhân viên ${helperDisplayName} sẽ xác nhận và liên hệ trong ít phút.`
                 : ' Hệ thống đang tự động điều phối người giúp việc phù hợp nhất cho bạn.'}
             </p>
 
-            <div className="bg-slate-50 rounded-2xl p-4 text-left text-xs space-y-2 border border-slate-100 mb-6">
+            <div className="bg-slate-50 rounded-2xl p-5 text-left text-xs sm:text-sm space-y-3 border border-slate-100 mb-6">
               <div className="flex justify-between">
                 <span className="text-slate-400">Dịch vụ:</span>
                 <span className="font-bold text-slate-800">{createdBooking?.serviceTitle || createdBooking?.service}</span>
@@ -254,57 +254,49 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
                   {createdBooking.dynamicSummary}
                 </div>
               )}
-              <div className="flex justify-between border-t border-slate-200/60 pt-2 font-bold text-sm">
+              <div className="flex justify-between border-t border-slate-200/60 pt-2 font-bold text-sm sm:text-base">
                 <span className="text-slate-600">Tổng tiền dự kiến:</span>
                 <span className="text-blue-600">{createdBooking?.price}</span>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2.5">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                to="/services"
+                className="py-2.5 px-5 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50"
+              >
+                Đặt thêm dịch vụ khác
+              </Link>
               <button
                 type="button"
-                onClick={handleClose}
-                className="w-full py-2.5 px-4 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                onClick={() => navigate('/customer')}
+                className="py-2.5 px-5 rounded-xl bg-blue-600 text-white text-xs sm:text-sm font-bold hover:bg-blue-700 flex items-center justify-center gap-1.5 shadow-sm"
               >
-                Tiếp tục ở Trang chủ
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  handleClose();
-                  navigate('/customer');
-                }}
-                className="w-full py-2.5 px-4 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 flex items-center justify-center gap-1.5 shadow-sm"
-              >
-                <span>Xem lịch sử đơn (/customer)</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <span>Xem lịch sử đơn hàng</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
         ) : (
-          /* Form Screen */
-          <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-            
-            {/* Service Summary Header Card */}
-            <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white text-blue-600 flex items-center justify-center font-bold shadow-xs">
-                  <User className="w-5 h-5" />
+          /* Form Screen 2-column layout */
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              
+              {/* Form Input Column (7 cols) */}
+              <div className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6">
+                
+                {/* Header Dịch vụ */}
+                <div className="border-b border-slate-100 pb-4">
+                  <span className="bg-blue-50 text-blue-700 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                    Form đặt dịch vụ
+                  </span>
+                  <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
+                    {activeService?.title}
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                    {activeService?.shortDescription}
+                  </p>
                 </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900">{activeService?.title}</div>
-                  <div className="text-[11px] text-blue-700 font-semibold">{helperDisplayName}</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-black text-slate-900">
-                  {pricingConfig.formattedPrice || `${formatVND(pricingConfig.pricePerHour)}/giờ`}
-                </span>
-                <div className="text-[10px] text-slate-500">
-                  Đánh giá: {activeService?.rating} ★ ({activeService?.reviewCount})
-                </div>
-              </div>
-            </div>
 
             {/* Chọn hình thức người giúp việc: AUTO hoặc CHỌN CỤ THỂ */}
             <div>
@@ -624,7 +616,7 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
 
             {/* Note */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
                 Ghi chú cho người giúp việc (tùy chọn)
               </label>
               <input
@@ -632,55 +624,118 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
                 value={customerNotes}
                 onChange={(e) => setCustomerNotes(e.target.value)}
                 placeholder="Ví dụ: Căn hộ tầng 12 bấm chuông cửa, nhà có mèo nhỏ..."
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
               />
             </div>
+          </div>
 
-            {/* Chi tiết tính giá Breakdown */}
-            <div className="pt-3 border-t border-slate-100 space-y-1.5 text-xs">
-              <div className="flex justify-between text-slate-500">
-                <span>Cước cơ bản ({calculationSummary.basePriceLabel}):</span>
-                <span className="font-semibold text-slate-800">{formatVND(calculationSummary.basePrice)}</span>
+          {/* CỘT PHẢI: TÓM TẮT ĐƠN HÀNG (STICKY - 5 Cột) */}
+          <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-4">
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <h3 className="font-extrabold text-slate-900 text-base">
+                  Tóm tắt đơn đặt lịch
+                </h3>
+                <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+                  Báo giá dự kiến
+                </span>
               </div>
 
-              {calculationSummary.extraItems.length > 0 && (
-                <div className="space-y-1 pt-1">
-                  {calculationSummary.extraItems.map((item, idx) => (
-                    <div key={idx} className="flex justify-between text-[11px] text-amber-700">
-                      <span>• {item.label}:</span>
-                      <span className="font-semibold">+{formatVND(item.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-slate-500">Tổng thanh toán dự kiến:</span>
-                  <div className="text-xl font-black text-blue-600">
-                    {formatVND(calculationSummary.totalPrice)}
+              {/* Service Card info */}
+              <div className="flex gap-3.5 items-center p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                <img
+                  src={activeService?.imageUrl}
+                  alt={activeService?.title}
+                  className="w-16 h-16 rounded-xl object-cover shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-black text-slate-900 truncate">{activeService?.title}</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    {pricingConfig.formattedPrice || `${formatVND(pricingConfig.pricePerHour)}/giờ`}
+                  </div>
+                  <div className="text-[10px] text-amber-500 font-bold mt-1 flex items-center gap-1">
+                    <span>★ {activeService?.rating || 4.9}</span>
+                    <span className="text-slate-400 font-normal">({activeService?.reviewCount || 100}+ đánh giá)</span>
                   </div>
                 </div>
-                <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Bảo hiểm trách nhiệm 100%</span>
+              </div>
+
+              {/* Schedule Details */}
+              <div className="space-y-2.5 text-xs text-slate-600">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Người thực hiện:</span>
+                  <span className="font-bold text-slate-800 text-right max-w-[200px] truncate">
+                    {helperDisplayName}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Thời gian:</span>
+                  <span className="font-bold text-slate-800">
+                    {workDate} lúc {startTime} {isHourlyService ? `(${durationHours} giờ)` : ''}
+                  </span>
+                </div>
+                <div className="flex justify-between items-start gap-3">
+                  <span className="text-slate-400 shrink-0">Địa điểm:</span>
+                  <span className="font-medium text-slate-700 text-right truncate max-w-[200px]">
+                    {fullAddress}
+                  </span>
                 </div>
               </div>
+
+              {/* Pricing Breakdown */}
+              <div className="pt-4 border-t border-slate-100 space-y-2 text-xs">
+                <div className="flex justify-between text-slate-600">
+                  <span>Cước cơ bản ({calculationSummary.basePriceLabel}):</span>
+                  <span className="font-bold text-slate-900">{formatVND(calculationSummary.basePrice)}</span>
+                </div>
+
+                {calculationSummary.extraItems.length > 0 && (
+                  <div className="space-y-1.5 pt-1 border-t border-dashed border-slate-200">
+                    {calculationSummary.extraItems.map((item, idx) => (
+                      <div key={idx} className="flex justify-between text-[11px] text-amber-700">
+                        <span>• {item.label}:</span>
+                        <span className="font-bold">+{formatVND(item.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-slate-200 flex items-baseline justify-between">
+                  <div>
+                    <div className="text-xs text-slate-500 font-medium">Tổng thanh toán dự kiến:</div>
+                    <div className="text-2xl font-black text-blue-600 mt-0.5">
+                      {formatVND(calculationSummary.totalPrice)}
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-slate-400">Đã gồm VAT &amp; bảo hiểm</div>
+                </div>
+              </div>
+
+              {/* Submit CTA */}
+              <button
+                type="submit"
+                className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-extrabold text-sm rounded-2xl shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Xác nhận đặt lịch ngay</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              {/* Trust guarantees */}
+              <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 flex items-center gap-2 text-[11px] text-emerald-800 font-medium">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Cam kết bảo hiểm trách nhiệm &amp; hỗ trợ đổi người miễn phí</span>
+              </div>
             </div>
+          </div>
 
-            {/* Submit CTA */}
-            <button
-              type="submit"
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <span>Xác nhận đặt lịch ngay</span>
-            </button>
-          </form>
-        )}
+        </div>
+      </form>
+    )}
+  </main>
 
-      </div>
-    </div>
-  );
+  <Footer />
+</div>
+);
 };
 
-export default BookingModal;
+export default BookingPage;

@@ -1,10 +1,11 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import BenefitsBanner from '../components/BenefitsBanner';
-import BookingModal from '../components/BookingModal';
 import Footer from '../components/Footer';
 import Pagination from '../components/Pagination';
 import ServiceFilterSidebar from '../components/ServiceFilterSidebar';
+import { resolveService } from '../mock/servicesData';
 import {
   Star,
   Heart,
@@ -239,10 +240,9 @@ const INITIAL_FILTERS = {
 const PAGE_SIZE = 9;
 
 const HelpersPage = () => {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [selectedHelper, setSelectedHelper] = useState({});
   const [favorites, setFavorites] = useState({});
   const [page, setPage] = useState(1);
   const listTopRef = useRef(null);
@@ -339,12 +339,10 @@ const HelpersPage = () => {
   };
 
   const handleBookHelper = (helper) => {
-    setSelectedHelper({
-      helperName: helper.name,
-      service: helper.skills[0] || 'Dọn dẹp nhà theo giờ',
-      hourlyRate: helper.hourlyRate,
-    });
-    setIsBookingOpen(true);
+    const srv = resolveService({ service: helper.skills[0] || 'Dọn dẹp nhà theo giờ' });
+    const params = new URLSearchParams();
+    params.set('helper', helper.name);
+    navigate(`/services/${srv?.id || 'SVC-001'}/book?${params.toString()}`);
   };
 
   return (
@@ -589,12 +587,6 @@ const HelpersPage = () => {
       </main>
 
       <Footer />
-
-      <BookingModal
-        isOpen={isBookingOpen}
-        onClose={() => setIsBookingOpen(false)}
-        initialData={selectedHelper}
-      />
     </div>
   );
 };

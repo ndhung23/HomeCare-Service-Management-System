@@ -1,17 +1,21 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import BenefitsBanner from '../components/BenefitsBanner';
-import BookingModal from '../components/BookingModal';
 import Footer from '../components/Footer';
 import Pagination from '../components/Pagination';
 import ServiceFilterSidebar from '../components/ServiceFilterSidebar';
 import {
   Sparkles,
+  SprayCan,
+  PartyPopper,
   UtensilsCrossed,
   Baby,
   UserCheck,
   Shirt,
   ShieldCheck,
+  AirVent,
+  Building2,
   ArrowRight,
   ArrowUpDown,
   ChevronDown,
@@ -19,143 +23,74 @@ import {
   Star,
   SearchX,
 } from 'lucide-react';
+import {
+  mockServices,
+  PRICING_TYPES,
+  SERVICE_CATEGORIES,
+} from '../mock/servicesData';
 import '../styles/Home.css';
 
+/* Map iconKey trong mock data -> icon component của lucide */
+const ICON_MAP = {
+  Sparkles,
+  SprayCan,
+  PartyPopper,
+  UtensilsCrossed,
+  Shirt,
+  Baby,
+  UserCheck,
+  AirVent,
+  Building2,
+  ShieldCheck,
+};
+
 /*
- * Danh sách dịch vụ hiện có trong hệ thống (mock data).
- * Khi backend có endpoint GET /api/services, thay bằng call API + loading state.
- * priceFrom / priceTo là đơn giá theo giờ (VND) dùng cho bộ lọc "Mức giá".
- * isPackage: dịch vụ bán theo gói/hợp đồng nên không áp bộ lọc giá theo giờ.
+ * Danh sách dịch vụ lấy từ mock data dùng chung (frontend/src/mock/servicesData.js).
+ * Khi backend có endpoint GET /api/services, chỉ cần thay nguồn `mockServices` bằng call API.
+ * Các trường dưới đây là "view model" phục vụ bộ lọc & card hiển thị.
  */
-const servicesList = [
-  {
-    id: 'cleaning',
-    title: 'Dọn dẹp nhà theo giờ',
-    subtitle: 'Nhà cửa luôn tinh tươm, sạch mát',
-    desc: 'Lau dọn phòng khách, hút bụi, lau sàn, cọ rửa nhà vệ sinh, sắp xếp đồ đạc gọn gàng.',
-    price: '120.000đ - 140.000đ / giờ',
-    priceFrom: 120000,
-    priceTo: 140000,
-    category: 'cleaning',
-    areas: ['Hà Nội', 'TP. Hồ Chí Minh', 'Đà Nẵng'],
-    rating: 4.9,
-    reviews: 1284,
-    bookings: 3210,
-    image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=800&q=70',
-    icon: Sparkles,
-    bgCircle: 'bg-blue-50 text-blue-600 border-blue-100',
-    tags: ['Hút bụi', 'Lau kính', 'Vệ sinh toilet', 'Gọn gàng'],
-  },
-  {
-    id: 'cooking',
-    title: 'Nấu ăn gia đình',
-    subtitle: 'Bữa cơm chuẩn vị mẹ nấu, dinh dưỡng',
-    desc: 'Đi chợ theo yêu cầu, sơ chế thực phẩm tươi ngon, nấu các món ăn hợp khẩu vị gia đình, dọn rửa bát đĩa.',
-    price: '130.000đ - 150.000đ / giờ',
-    priceFrom: 130000,
-    priceTo: 150000,
-    category: 'cooking',
-    areas: ['Hà Nội', 'TP. Hồ Chí Minh', 'Đà Nẵng'],
-    rating: 4.8,
-    reviews: 986,
-    bookings: 2480,
-    image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&w=800&q=70',
-    icon: UtensilsCrossed,
-    bgCircle: 'bg-amber-50 text-amber-600 border-amber-100',
-    tags: ['Đi chợ', 'Nấu món Bắc - Trung - Nam', 'Dọn bếp'],
-  },
-  {
-    id: 'babysitting',
-    title: 'Chăm sóc trẻ nhỏ',
-    subtitle: 'Yêu thương, an toàn, tận tâm',
-    desc: 'Đưa đón bé đi học, cho bé ăn uống đúng giờ, chơi cùng bé, giám sát an toàn và rèn luyện thói quen tốt.',
-    price: '140.000đ - 160.000đ / giờ',
-    priceFrom: 140000,
-    priceTo: 160000,
-    category: 'babysitting',
-    areas: ['Hà Nội', 'TP. Hồ Chí Minh'],
-    rating: 4.9,
-    reviews: 742,
-    bookings: 1690,
-    image: 'https://images.unsplash.com/photo-1516627145497-ae6968895b74?auto=format&fit=crop&w=800&q=70',
-    icon: Baby,
-    bgCircle: 'bg-rose-50 text-rose-500 border-rose-100',
-    tags: ['Kinh nghiệm trông trẻ', 'Tập ăn dặm', 'Đưa đón'],
-  },
-  {
-    id: 'elderly',
-    title: 'Chăm sóc người già & người bệnh',
-    subtitle: 'Ân cần, chu đáo, hiểu tâm lý',
-    desc: 'Hỗ trợ sinh hoạt hàng ngày, nhắc uống thuốc đúng cữ, trò chuyện bầu bạn, xoa bóp và đi dạo nhẹ nhàng.',
-    price: '150.000đ - 180.000đ / giờ',
-    priceFrom: 150000,
-    priceTo: 180000,
-    category: 'elderly',
-    areas: ['Hà Nội', 'TP. Hồ Chí Minh', 'Đà Nẵng'],
-    rating: 4.8,
-    reviews: 615,
-    bookings: 1320,
-    image: 'https://images.unsplash.com/photo-1584515933487-779824d29309?auto=format&fit=crop&w=800&q=70',
-    icon: UserCheck,
-    bgCircle: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    tags: ['Kiểm tra huyết áp', 'Nhắc thuốc', 'Tâm lý người cao tuổi'],
-  },
-  {
-    id: 'laundry',
-    title: 'Giặt ủi, phơi & gấp quần áo',
-    subtitle: 'Tiện lợi, thơm tho, nhanh chóng',
-    desc: 'Phân loại đồ trắng - màu, giặt máy/giặt tay đồ nhạy cảm, phơi nắng thơm mát, là ủi phẳng phiu và xếp tủ.',
-    price: '110.000đ - 130.000đ / giờ',
-    priceFrom: 110000,
-    priceTo: 130000,
-    category: 'laundry',
-    areas: ['Hà Nội', 'TP. Hồ Chí Minh', 'Đà Nẵng'],
-    rating: 4.7,
-    reviews: 438,
-    bookings: 1150,
-    image: 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=800&q=70',
-    icon: Shirt,
-    bgCircle: 'bg-purple-50 text-purple-600 border-purple-100',
-    tags: ['Là ủi áo sơ mi', 'Phân loại vải', 'Xếp tủ ngăn nắp'],
-  },
-  {
-    id: 'hourly',
-    title: 'Giúp việc định kỳ & tổng vệ sinh',
-    subtitle: 'Tiết kiệm chi phí, cố định người làm',
-    desc: 'Gói định kỳ 3 - 5 buổi/tuần hoặc gói tổng vệ sinh nhà mới sửa chữa, dọn dẹp nhà đón lễ Tết.',
-    price: 'Ưu đãi tiết kiệm đến 20%',
-    isPackage: true,
-    category: 'package',
-    areas: ['Hà Nội', 'TP. Hồ Chí Minh', 'Đà Nẵng'],
-    rating: 4.9,
-    reviews: 512,
-    bookings: 870,
-    image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=800&q=70',
-    icon: ShieldCheck,
-    bgCircle: 'bg-cyan-50 text-cyan-600 border-cyan-100',
-    tags: ['Người làm cố định', 'Đổi người miễn phí', 'Hợp đồng linh hoạt'],
-  },
-];
-/* Bộ lọc danh mục (dropdown) */
+const servicesList = mockServices.map((service) => ({
+  id: service.id,
+  serviceId: service.id,
+  serviceCode: service.serviceCode,
+  title: service.title,
+  subtitle: service.subtitle,
+  desc: service.shortDescription,
+  description: service.description,
+  price: service.pricing.formattedPrice,
+  priceFrom: service.pricing.priceFrom,
+  priceTo: service.pricing.priceTo,
+  sortPrice: service.pricing.sortPrice,
+  pricing: service.pricing,
+  category: service.category,
+  areas: service.areas,
+  rating: service.rating,
+  reviews: service.reviewCount,
+  bookings: service.bookingCount,
+  image: service.imageUrl,
+  icon: ICON_MAP[service.iconKey] || Sparkles,
+  bgCircle: service.themeClass,
+  tags: service.tags,
+  isPackage: service.isPackage,
+  isHourly: service.pricing.type === PRICING_TYPES.HOURLY,
+  raw: service,
+}));
+/* Bộ lọc danh mục (dropdown) - lấy từ danh mục của mock data */
 const CATEGORY_OPTIONS = [
   { id: 'all', label: 'Tất cả danh mục' },
-  { id: 'cleaning', label: 'Dọn dẹp nhà cửa' },
-  { id: 'cooking', label: 'Nấu ăn gia đình' },
-  { id: 'babysitting', label: 'Chăm sóc trẻ nhỏ' },
-  { id: 'elderly', label: 'Chăm sóc người già' },
-  { id: 'laundry', label: 'Giặt ủi - Là quần áo' },
-  { id: 'package', label: 'Gói định kỳ - Tổng vệ sinh' },
+  ...SERVICE_CATEGORIES.map((category) => ({ id: category, label: category })),
 ];
 
-/* Khu vực đang có người giúp việc (dropdown) */
-const AREA_OPTIONS = ['Hà Nội', 'TP. Hồ Chí Minh', 'Đà Nẵng'];
+/* Khu vực đang có người giúp việc (dropdown) - suy ra từ dữ liệu dịch vụ */
+const AREA_OPTIONS = [...new Set(servicesList.flatMap((srv) => srv.areas))];
 
-/* Bộ lọc mức giá theo đơn giá/giờ */
+/* Bộ lọc mức giá: theo đơn giá/giờ quy đổi của từng dịch vụ */
 const PRICE_OPTIONS = [
   { id: 'all', label: 'Tất cả mức giá' },
   { id: 'under-120', label: 'Dưới 120.000đ', min: 0, max: 119999 },
   { id: '120-150', label: '120.000đ - 150.000đ', min: 120000, max: 150000 },
-  { id: 'over-150', label: 'Trên 150.000đ', min: 150001, max: Number.MAX_SAFE_INTEGER },
+  { id: '150-200', label: '150.000đ - 200.000đ', min: 150001, max: 200000 },
+  { id: 'over-200', label: 'Trên 200.000đ', min: 200001, max: Number.MAX_SAFE_INTEGER },
   { id: 'package', label: 'Gói ưu đãi / theo hợp đồng', packageOnly: true },
 ];
 
@@ -189,8 +124,7 @@ const INITIAL_FILTERS = {
 const PAGE_SIZE = 9;
 
 const ServicesPage = () => {
-  const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState({});
+  const navigate = useNavigate();
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -239,6 +173,7 @@ const ServicesPage = () => {
         if (!srv.isPackage) return false;
       } else if (priceFilter.min !== undefined) {
         if (srv.isPackage) return false; // gói ưu đãi không có đơn giá theo giờ
+        if (srv.priceFrom == null || srv.priceTo == null) return false;
         if (!(srv.priceFrom <= priceFilter.max && srv.priceTo >= priceFilter.min)) return false;
       }
 
@@ -287,11 +222,7 @@ const ServicesPage = () => {
   };
 
   const handleBookService = (srv) => {
-    setSelectedService({
-      service: srv.title,
-      hourlyRate: srv.priceFrom || 120000,
-    });
-    setIsBookingOpen(true);
+    navigate(`/services/${srv.serviceId || srv.id}/book`);
   };
 
   return (
@@ -555,12 +486,6 @@ const ServicesPage = () => {
       </main>
 
       <Footer />
-
-      <BookingModal
-        isOpen={isBookingOpen}
-        onClose={() => setIsBookingOpen(false)}
-        initialData={selectedService}
-      />
     </div>
   );
 };
