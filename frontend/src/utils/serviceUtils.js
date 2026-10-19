@@ -38,10 +38,35 @@ export const formatVND = (value) => `${Number(value || 0).toLocaleString('vi-VN'
 const opt = (label, extra = {}) => ({ value: label, label, ...extra });
 
 export const M2_AREA_OPTIONS = [
-  opt('Dưới 50m² (Studio/1PN)', { sqm: 45 }),
-  opt('55 - 85m² (2PN)', { sqm: 70 }),
-  opt('85 - 105m² (3PN)', { sqm: 95 }),
-  opt('Trên 105m² / Nhà tầng', { sqm: 130 }),
+  opt('Dưới 50m² (Studio/1PN)', { sqm: 45, extraFee: 0 }),
+  opt('55 - 85m² (2PN)', { sqm: 70, extraFee: 30000 }),
+  opt('85 - 110m² (3PN)', { sqm: 95, extraFee: 60000 }),
+  opt('Trên 110m² / Căn góc rộng', { sqm: 130, extraFee: 100000 }),
+];
+
+export const FLOOR_OPTIONS = [
+  opt('1 tầng (Căn hộ chung cư / Nhà trệt)', { extraFee: 0 }),
+  opt('2 tầng (Nhà 1 trệt 1 lầu)', { extraFee: 50000 }),
+  opt('3 tầng', { extraFee: 100000 }),
+  opt('4 tầng trở lên', { extraFee: 150000 }),
+];
+
+export const CHILD_COUNT_OPTIONS = [
+  opt('1 bé (Giá tiêu chuẩn)', { extraFee: 0 }),
+  opt('2 bé (Phụ thu trọn gói +60.000đ/ca)', { extraFee: 60000 }),
+  opt('Từ 3 bé trở lên (Phụ thu +120.000đ/ca)', { extraFee: 120000 }),
+];
+
+export const LAUNDRY_WEIGHT_OPTIONS = [
+  opt('Dưới 5kg (1 lồng giặt tiêu chuẩn 1-2 người)', { extraFee: 0 }),
+  opt('5kg - 9kg (Gia đình 3-4 người)', { extraFee: 40000 }),
+  opt('Từ 10kg trở lên / Có chăn mền, rèm cửa', { extraFee: 80000 }),
+];
+
+export const IRONING_PACKAGE_OPTIONS = [
+  opt('Không ủi đồ (chỉ giặt, phơi khô & gấp gọn)', { extraFee: 0 }),
+  opt('Ủi cơ bản (1 - 5 áo sơ mi/quần âu)', { extraFee: 30000 }),
+  opt('Ủi nâng cao (6 - 10 áo sơ mi/quần âu)', { extraFee: 60000 }),
 ];
 
 export const PRIORITY_OPTIONS = [
@@ -67,7 +92,7 @@ export const EATER_COUNT_OPTIONS = [
 ];
 
 export const CHILD_AGE_OPTIONS = [
-  opt('Dưới 1 tuổi'),
+  opt('Dưới 12 tháng (Trẻ sơ sinh)', { extraFeePerHour: 30000 }),
   opt('1 - 3 tuổi'),
   opt('4 - 6 tuổi'),
   opt('Trên 6 tuổi'),
@@ -177,6 +202,13 @@ export const computePricing = (service, { durationHours, dynamicAttributes = {} 
       if (value && field.extraFee) {
         extraItems.push({ label: field.label, amount: field.extraFee, type: 'fee' });
       }
+      if (value && field.extraFeePerHour) {
+        extraItems.push({
+          label: `${field.label} (${hours}h × ${formatVND(field.extraFeePerHour)})`,
+          amount: field.extraFeePerHour * hours,
+          type: 'fee',
+        });
+      }
       return;
     }
 
@@ -202,6 +234,13 @@ export const computePricing = (service, { durationHours, dynamicAttributes = {} 
             label: option.advance ? 'Tạm ứng tiền đi chợ (hoàn lại phần chưa dùng)' : option.label,
             amount: option.extraFee,
             type: option.advance ? 'advance' : 'fee',
+          });
+        }
+        if (option?.extraFeePerHour) {
+          extraItems.push({
+            label: `${option.label} (${hours}h × ${formatVND(option.extraFeePerHour)})`,
+            amount: option.extraFeePerHour * hours,
+            type: 'fee',
           });
         }
       });

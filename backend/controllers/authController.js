@@ -23,18 +23,22 @@ const getRoleName = (role) => {
 };
 
 const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET || 'fallback_secret', {
+  return jwt.sign({ id: userId }, process.env.JWT_SECRET || 'giupviec24_jwt_secret_key_2026', {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
 };
 
 export const register = async (req, res) => {
   try {
-    const { name, fullName, email, password, phone, role } = req.body;
+    const { name, fullName, email, password, confirmPassword, phone, role } = req.body;
     const userName = name || fullName;
 
     if (!userName || !email || !password) {
-      return res.status(400).json({ message: 'Vui lòng cung cấp họ tên, email và mật khẩu' });
+      return res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ họ tên, email và mật khẩu' });
+    }
+
+    if (confirmPassword && password !== confirmPassword) {
+      return res.status(400).json({ message: 'Mật khẩu xác nhận không trùng khớp' });
     }
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
@@ -58,22 +62,30 @@ export const register = async (req, res) => {
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
     });
 
+const sanitizeUser = (u) => ({
+  id: u._id,
+  name: u.name,
+  email: u.email,
+  role: u.role,
+  roleName: u.roleName || getRoleName(u.role),
+  phone: u.phone,
+  avatar: u.avatar,
+  status: u.status || 'ACTIVE',
+  kycLevel: u.kycLevel || 1,
+  kyc: u.kyc,
+  bank: u.bank,
+  wallet: u.wallet,
+  employees: u.employees || [],
+  redirectPath: u.redirectPath || (u.role === 'customer' ? '/' : getRoleDashboardPath(u.role)),
+  dashboardPath: u.dashboardPath || getRoleDashboardPath(u.role),
+});
+
     const token = generateToken(user._id);
 
     res.status(201).json({
       success: true,
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        roleName: user.roleName,
-        phone: user.phone,
-        avatar: user.avatar,
-        redirectPath: user.redirectPath,
-        dashboardPath: user.dashboardPath,
-      },
+      user: sanitizeUser(user),
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -109,17 +121,7 @@ export const login = async (req, res) => {
     res.json({
       success: true,
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        roleName: user.roleName || getRoleName(user.role),
-        phone: user.phone,
-        avatar: user.avatar,
-        redirectPath: user.redirectPath || (user.role === 'customer' ? '/' : getRoleDashboardPath(user.role)),
-        dashboardPath: user.dashboardPath || getRoleDashboardPath(user.role),
-      },
+      user: sanitizeUser(user),
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -138,13 +140,51 @@ export const getAllUsers = async (req, res) => {
 
 export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user?.id).select('-password');
+    const user = await User.findById(req.user?.id || req.user?._id).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
-    res.json(user);
+    res.json({
+      success: true,
+      user: sanitizeUser(user),
+    });
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server', error: error.message });
+  }
+};
+
+export const addEmployee = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user || user.role !== 'enterprise') {
+      return res.status(403).json({ message: 'Chỉ tài khoản Doanh nghiệp mới có thể thêm nhân viên' });
+    }
+
+    const { name, phone, birthYear, gender = 'Nữ' } = req.body;
+    if (!name || !phone) {
+      return res.status(400).json({ message: 'Vui lòng cung cấp họ tên và số điện thoại nhân viên' });
+    }
+
+    const newEmp = {
+      id: `EMP-${Date.now().toString().slice(-4)}`,
+      name,
+      phone,
+      birthYear: Number(birthYear) || 1990,
+      gender,
+      status: 'AVAILABLE',
+    };
+
+    user.employees.push(newEmp);
+    await user.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Thêm nhân viên thành công!',
+      employee: newEmp,
+      employees: user.employees,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi khi thêm nhân viên', error: error.message });
   }
 };
 

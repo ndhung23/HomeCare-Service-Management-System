@@ -51,6 +51,29 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // Verify JWT session on app start
+  useEffect(() => {
+    const token = localStorage.getItem('giupviec24_token');
+    if (token) {
+      authApi
+        .getMe()
+        .then((res) => {
+          if (res?.user) {
+            setUser(res.user);
+            localStorage.setItem('giupviec24_user', JSON.stringify(res.user));
+          }
+        })
+        .catch((err) => {
+          if (err.response?.status === 401) {
+            console.warn('JWT token hết hạn hoặc không hợp lệ');
+            localStorage.removeItem('giupviec24_token');
+            localStorage.removeItem('giupviec24_user');
+            setUser(null);
+          }
+        });
+    }
+  }, []);
+
   useEffect(() => {
     fetchAccounts();
     fetchBookings();
@@ -64,7 +87,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
-  // Login via MongoDB API
+  // Login via MongoDB API with JWT
   const login = async (emailOrRole, password = '') => {
     try {
       const payload = emailOrRole.includes('@')
@@ -80,28 +103,18 @@ export const AuthProvider = ({ children }) => {
       return loggedUser;
     } catch (err) {
       console.error('Lỗi đăng nhập:', err);
-      // Fallback local if server network issue
-      const fallbackUser = {
-        role: emailOrRole.includes('@') ? 'customer' : emailOrRole,
-        name: emailOrRole.split('@')[0] || 'Người dùng',
-        email: emailOrRole.includes('@') ? emailOrRole : `${emailOrRole}@giupviec24.vn`,
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
-        redirectPath: emailOrRole === 'customer' || emailOrRole.includes('@') ? '/' : getRoleDashboardPath(emailOrRole),
-        dashboardPath: getRoleDashboardPath(emailOrRole.includes('@') ? 'customer' : emailOrRole),
-        roleName: 'Khách hàng',
-      };
-      setUser(fallbackUser);
-      return fallbackUser;
+      throw err;
     }
   };
 
-  // Register via MongoDB API
+  // Register via MongoDB API with JWT
   const register = async (userData) => {
     try {
       const res = await authApi.register({
         name: userData.fullName || userData.name,
         email: userData.email,
-        password: userData.password || '123',
+        password: userData.password,
+        confirmPassword: userData.confirmPassword,
         phone: userData.phone || '',
         role: userData.role || 'customer',
       });
@@ -114,19 +127,7 @@ export const AuthProvider = ({ children }) => {
       return newUser;
     } catch (err) {
       console.error('Lỗi đăng ký:', err);
-      const role = userData.role || 'customer';
-      const fallbackUser = {
-        role,
-        name: userData.fullName || 'Người dùng mới',
-        email: userData.email,
-        phone: userData.phone || '',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
-        redirectPath: role === 'customer' ? '/' : getRoleDashboardPath(role),
-        dashboardPath: getRoleDashboardPath(role),
-        roleName: role === 'admin' ? 'Quản trị viên' : role === 'enterprise' ? 'Đối tác doanh nghiệp' : role === 'helper' ? 'Cộng tác viên' : 'Khách hàng',
-      };
-      setUser(fallbackUser);
-      return fallbackUser;
+      throw err;
     }
   };
 

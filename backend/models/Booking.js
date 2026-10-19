@@ -19,11 +19,25 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
     service: {
       type: String,
       required: true,
     },
     serviceId: {
+      type: String,
+      default: '',
+    },
+    serviceCode: {
+      type: String,
+      default: '',
+    },
+    preferredHelperId: {
       type: String,
       default: '',
     },
@@ -34,6 +48,23 @@ const bookingSchema = new mongoose.Schema(
     workerId: {
       type: String,
       default: '',
+    },
+    assigneeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
+    assigneeType: {
+      type: String,
+      enum: ['HELPER', 'ENTERPRISE'],
+      default: 'HELPER',
+    },
+    assignedEmployee: {
+      id: { type: String, default: '' },
+      name: { type: String, default: '' },
+      phone: { type: String, default: '' },
+      avatar: { type: String, default: '' },
     },
     date: {
       type: String,
@@ -47,17 +78,34 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       default: 2,
     },
+    startAt: {
+      type: Date,
+      index: true,
+    },
+    endAt: {
+      type: Date,
+      index: true,
+    },
     address: {
       type: String,
       required: true,
     },
     price: {
       type: String,
-      required: true,
+      default: '',
     },
     totalPrice: {
       type: Number,
       default: 0,
+    },
+    pricingSnapshot: {
+      basePrice: { type: Number, default: 0 },
+      laborTotal: { type: Number, default: 0 },
+      advanceFee: { type: Number, default: 0 },
+      extraItems: { type: Array, default: [] },
+      feeRate: { type: Number, default: 0.2 },
+      platformFee: { type: Number, default: 0 },
+      helperEarnings: { type: Number, default: 0 },
     },
     notes: {
       type: String,
@@ -69,12 +117,80 @@ const bookingSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Chờ người nhận', 'Sắp diễn ra', 'Đang thực hiện', 'Đã hoàn thành', 'Đã hủy'],
-      default: 'Chờ người nhận',
+      enum: [
+        'PENDING',
+        'UPCOMING',
+        'IN_PROGRESS',
+        'AWAITING_PAYMENT',
+        'COMPLETED',
+        'CANCELLED',
+        'DISPUTED',
+        // Legacy support
+        'Chờ người nhận',
+        'Sắp diễn ra',
+        'Đang thực hiện',
+        'Đã hoàn thành',
+        'Đã hủy',
+      ],
+      default: 'PENDING',
+      index: true,
     },
     statusColor: {
       type: String,
       default: 'amber',
+    },
+    acceptedBy: {
+      type: String,
+      default: '',
+    },
+    helperPhone: {
+      type: String,
+      default: '',
+    },
+    acceptedAt: {
+      type: Date,
+    },
+    startedAt: {
+      type: Date,
+    },
+    completedAt: {
+      type: Date,
+    },
+    evidence: {
+      type: [String],
+      default: [],
+    },
+    platformFee: {
+      type: Number,
+      default: 0,
+    },
+    helperEarnings: {
+      type: Number,
+      default: 0,
+    },
+    payoutStatus: {
+      type: String,
+      enum: ['Chờ quyết toán', 'Đã cộng vào ví', 'Đã thanh toán'],
+      default: 'Chờ quyết toán',
+    },
+    paidAt: {
+      type: Date,
+      default: null,
+    },
+    paymentConfirmedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    cancelRequest: {
+      requestedBy: { type: String, default: '' },
+      requestedRole: { type: String, default: '' },
+      reason: { type: String, default: '' },
+      requestedAt: { type: Date, default: null },
+    },
+    isReviewed: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

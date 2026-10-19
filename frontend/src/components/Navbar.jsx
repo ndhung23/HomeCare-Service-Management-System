@@ -1,12 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, LogOut, LayoutDashboard, User, Settings, ChevronDown, RotateCw } from 'lucide-react';
+import { Search, LogOut, LayoutDashboard, User, Settings, ChevronDown, RotateCw, Bell, CheckCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import notificationApi from '../api/notificationApi';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifs, setShowNotifs] = useState(false);
+
+  const fetchNotifs = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await notificationApi.getNotifications();
+      if (Array.isArray(data)) setNotifications(data);
+    } catch {
+      // ignore
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(interval);
+  }, [fetchNotifs]);
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationApi.markAsRead('all');
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <header className="gv-header w-full">
@@ -80,6 +111,62 @@ const Navbar = () => {
             >
               <Search className="w-5 h-5" />
             </button>
+
+            {user && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowNotifs(!showNotifs)}
+                  className="p-2 rounded-full text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors relative"
+                  aria-label="Thông báo"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-pulse">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifs && (
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-3 z-50 text-slate-800">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
+                      <span className="text-xs font-bold text-slate-900">Thông báo ({unreadCount})</span>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          className="text-[11px] text-blue-600 hover:underline flex items-center gap-1 font-semibold"
+                        >
+                          <CheckCheck className="w-3.5 h-3.5" />
+                          <span>Đã đọc hết</span>
+                        </button>
+                      )}
+                    </div>
+                    {notifications.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-slate-400">Không có thông báo mới</div>
+                    ) : (
+                      <div className="max-h-64 overflow-y-auto space-y-2">
+                        {notifications.slice(0, 10).map((n) => (
+                          <div
+                            key={n._id || n.id}
+                            onClick={() => {
+                              if (n.link) navigate(n.link);
+                              setShowNotifs(false);
+                            }}
+                            className={`p-2.5 rounded-xl text-xs cursor-pointer transition-all ${
+                              n.isRead ? 'bg-slate-50 text-slate-600' : 'bg-blue-50/70 text-slate-900 font-semibold border border-blue-100'
+                            }`}
+                          >
+                            <div className="font-bold text-slate-900">{n.title}</div>
+                            <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{n.message}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {user ? (
               /* User logged in state with hover dropdown */

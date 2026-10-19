@@ -48,11 +48,18 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
   // Xác định dịch vụ hiện tại dựa trên initialData và danh sách services
   const activeService = useMemo(() => resolveService(initialData, services), [initialData, services]);
 
+  // Helper tạo ngày mai mặc định
+  const getTomorrow = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  };
+
   // Các state form cơ bản
   const [workerOption, setWorkerOption] = useState('AUTO'); // 'AUTO' | 'SPECIFIC'
   const [selectedWorkerId, setSelectedWorkerId] = useState('');
   const [durationHours, setDurationHours] = useState(3);
-  const [workDate, setWorkDate] = useState('2026-09-28');
+  const [workDate, setWorkDate] = useState(getTomorrow());
   const [startTime, setStartTime] = useState('14:00');
   const [fullAddress, setFullAddress] = useState(
     'Căn hộ 1204, Vinhomes D’Capitale, Trần Duy Hưng, Hà Nội'
@@ -131,7 +138,7 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) {
       alert('Vui lòng đăng nhập tài khoản Khách hàng để đặt dịch vụ!');
@@ -446,13 +453,14 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Ngày làm việc
+                  Ngày làm việc <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="date"
                     required
+                    min={new Date().toISOString().split('T')[0]}
                     value={workDate}
                     onChange={(e) => setWorkDate(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
@@ -462,7 +470,7 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Giờ bắt đầu
+                  Giờ bắt đầu <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Clock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -480,7 +488,7 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
             {/* Address */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Địa chỉ làm việc
+                Địa chỉ làm việc <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <MapPin className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
@@ -526,7 +534,7 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
                           >
                             {(field.options || []).map((opt) => (
                               <option key={opt.value} value={opt.value}>
-                                {opt.label} {opt.extraFee ? `(+${formatVND(opt.extraFee)})` : ''}
+                                {opt.label} {opt.extraFee ? `(+${formatVND(opt.extraFee)})` : opt.extraFeePerHour ? `(+${formatVND(opt.extraFeePerHour)}/giờ)` : ''}
                               </option>
                             ))}
                           </select>
@@ -570,6 +578,10 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
                                   <span className="text-[10px] text-amber-600 font-semibold">
                                     (+{formatVND(opt.extraFee)})
                                   </span>
+                                ) : opt.extraFeePerHour ? (
+                                  <span className="text-[10px] text-amber-600 font-semibold">
+                                    (+{formatVND(opt.extraFeePerHour)}/giờ)
+                                  </span>
                                 ) : null}
                               </button>
                             );
@@ -592,6 +604,11 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
                           {field.extraFee > 0 && (
                             <div className="text-[11px] text-amber-600 font-bold">
                               Phụ phí: +{formatVND(field.extraFee)}
+                            </div>
+                          )}
+                          {field.extraFeePerHour > 0 && (
+                            <div className="text-[11px] text-amber-600 font-bold">
+                              Phụ phí: +{formatVND(field.extraFeePerHour)}/giờ
                             </div>
                           )}
                         </div>

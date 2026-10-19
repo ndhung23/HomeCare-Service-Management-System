@@ -5,6 +5,7 @@ export const authApi = {
   register: (userData) => axiosClient.post('/auth/register', userData).then((res) => res.data),
   getMe: () => axiosClient.get('/auth/me').then((res) => res.data),
   getAccounts: () => axiosClient.get('/auth/users').then((res) => res.data),
+  addEmployee: (employeeData) => axiosClient.post('/auth/employees', employeeData).then((res) => res.data),
 };
 
 export default authApi;

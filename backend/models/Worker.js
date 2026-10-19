@@ -2,6 +2,11 @@ import mongoose from 'mongoose';
 
 const workerSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
     code: {
       type: String,
       default: '',

@@ -19,6 +19,20 @@ const reviewSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    bookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Booking',
+      default: null,
+    },
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    workerId: {
+      type: String,
+      default: '',
+    },
     helper: {
       type: String,
       default: '',

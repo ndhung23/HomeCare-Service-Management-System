@@ -14,6 +14,7 @@ import EnterpriseDashboard from './pages/enterprise/EnterpriseDashboard';
 import HelperProfile from './pages/helper/HelperProfile';
 import CustomerProfile from './pages/customer/CustomerProfile';
 import BookingPage from './pages/BookingPage';
+import RequireRole from './components/auth/RequireRole';
 import './index.css';
 
 // Dynamic /profile redirector based on logged-in role
@@ -42,10 +43,38 @@ function App() {
           <Route path="/register" element={<Register />} />
           
           {/* Role specific routes */}
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/enterprise" element={<EnterpriseDashboard />} />
-          <Route path="/helper" element={<HelperProfile />} />
-          <Route path="/customer" element={<CustomerProfile />} />
+          <Route
+            path="/admin"
+            element={
+              <RequireRole allowedRoles={['admin']}>
+                <AdminDashboard />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/enterprise"
+            element={
+              <RequireRole allowedRoles={['enterprise', 'admin']}>
+                <EnterpriseDashboard />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/helper"
+            element={
+              <RequireRole allowedRoles={['helper', 'admin']}>
+                <HelperProfile />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/customer"
+            element={
+              <RequireRole allowedRoles={['customer', 'admin']}>
+                <CustomerProfile />
+              </RequireRole>
+            }
+          />
           
           {/* General profile route redirects to user's role dashboard */}
           <Route path="/profile" element={<ProfileRedirect />} />

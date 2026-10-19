@@ -12,22 +12,48 @@ const Register = () => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!fullName || !email) {
-      alert('Vui lòng nhập họ tên và email để đăng ký!');
+    setErrorMessage('');
+
+    if (!fullName.trim() || !email.trim() || !password || !phone.trim() || !confirmPassword) {
+      setErrorMessage('Vui lòng nhập đầy đủ các thông tin bắt buộc (họ tên, email, số điện thoại, mật khẩu)!');
       return;
     }
-    const newUser = await register({
-      role,
-      fullName,
-      email,
-      phone,
-      password,
-    });
-    navigate(newUser.redirectPath || '/');
+
+    if (password !== confirmPassword) {
+      setErrorMessage('Mật khẩu xác nhận không trùng khớp!');
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMessage('Mật khẩu phải có độ dài tối thiểu 6 ký tự!');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const newUser = await register({
+        role,
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password,
+        confirmPassword,
+      });
+      navigate(newUser.redirectPath || '/');
+    } catch (err) {
+      console.error('Đăng ký thất bại:', err);
+      const apiMessage = err.response?.data?.message || 'Đăng ký tài khoản không thành công, vui lòng thử lại!';
+      setErrorMessage(apiMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const roles = [
@@ -135,12 +161,18 @@ const Register = () => {
 
         {/* Register Form */}
         <div className="bg-white py-8 px-6 shadow-md rounded-2xl border border-slate-100 sm:px-8">
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
+              {errorMessage}
+            </div>
+          )}
+
           <form className="space-y-4" onSubmit={handleSubmit}>
             
             {/* Full Name */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Họ và tên
+                Họ và tên <span className="text-red-500">*</span>
               </label>
               <div className="relative rounded-xl">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -160,7 +192,7 @@ const Register = () => {
             {/* Email Field */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Địa chỉ Email
+                Địa chỉ Email <span className="text-red-500">*</span>
               </label>
               <div className="relative rounded-xl">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -180,7 +212,7 @@ const Register = () => {
             {/* Phone Field */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Số điện thoại
+                Số điện thoại <span className="text-red-500">*</span>
               </label>
               <div className="relative rounded-xl">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -188,6 +220,7 @@ const Register = () => {
                 </div>
                 <input
                   type="tel"
+                  required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="0987 654 321"
@@ -199,7 +232,7 @@ const Register = () => {
             {/* Password Field */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Mật khẩu
+                Mật khẩu <span className="text-red-500">*</span>
               </label>
               <div className="relative rounded-xl">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -210,7 +243,27 @@ const Register = () => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Tạo mật khẩu an toàn"
+                  placeholder="Tạo mật khẩu an toàn (tối thiểu 6 ký tự)"
+                  className="block w-full pl-10 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+            </div>
+
+            {/* Confirm Password Field */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Xác nhận lại mật khẩu <span className="text-red-500">*</span>
+              </label>
+              <div className="relative rounded-xl">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Nhập lại mật khẩu"
                   className="block w-full pl-10 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                 />
               </div>
@@ -234,9 +287,10 @@ const Register = () => {
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+                disabled={isLoading}
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-60"
               >
-                Đăng ký tài khoản
+                {isLoading ? 'Đang tạo tài khoản...' : 'Đăng ký tài khoản'}
               </button>
             </div>
           </form>

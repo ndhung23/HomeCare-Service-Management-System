@@ -1,152 +1,246 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { 
   Building2, 
   Users, 
   CalendarCheck, 
   DollarSign, 
-  PlusCircle,
-  Clock,
-  Briefcase,
-  FileCheck,
-  Settings
+  Clock, 
+  Briefcase
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import bookingApi from '../../api/bookingApi';
+import authApi from '../../api/authApi';
+import walletApi from '../../api/walletApi';
+import { formatVND } from '../../utils/serviceUtils';
+
+import MarketTab from './tabs/MarketTab';
+import ScheduleTab from './tabs/ScheduleTab';
+import EmployeesTab from './tabs/EmployeesTab';
+import WalletTab from './tabs/WalletTab';
 
 const EnterpriseDashboard = () => {
+  const { user } = useAuth();
+  const [currentUser, setCurrentUser] = useState(user);
+  const [activeTab, setActiveTab] = useState('MARKET'); // 'MARKET' | 'SCHEDULE' | 'EMPLOYEES' | 'WALLET'
+  const [openBookings, setOpenBookings] = useState([]);
+  const [companyBookings, setCompanyBookings] = useState([]);
+  const [walletData, setWalletData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const employees = currentUser?.employees || user?.employees || [];
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [marketRes, allBookingsRes, meRes, wRes] = await Promise.allSettled([
+        bookingApi.getMarketBookings(),
+        bookingApi.getBookings(),
+        authApi.getMe(),
+        walletApi.getWallet(),
+      ]);
+
+      if (marketRes.status === 'fulfilled' && Array.isArray(marketRes.value)) {
+        setOpenBookings(marketRes.value);
+      }
+      if (allBookingsRes.status === 'fulfilled' && Array.isArray(allBookingsRes.value)) {
+        const myCompanyId = user?.id || user?._id;
+        const myName = user?.name || '';
+        setCompanyBookings(
+          allBookingsRes.value.filter((b) => {
+            return (
+              b.assigneeId === myCompanyId ||
+              b.acceptedBy === myCompanyId ||
+              b.workerId === myCompanyId ||
+              (b.helper && myName && b.helper.includes(myName)) ||
+              (b.helper && b.helper.includes('CleanPro'))
+            );
+          })
+        );
+      }
+      if (meRes.status === 'fulfilled' && meRes.value?.user) {
+        setCurrentUser(meRes.value.user);
+      }
+      if (wRes.status === 'fulfilled') {
+        setWalletData(wRes.value);
+      }
+    } catch (err) {
+      console.error('Lỗi tải dữ liệu doanh nghiệp:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   const enterpriseNav = [
     { label: 'Bàn làm việc Doanh nghiệp', path: '/enterprise', icon: Building2 },
-    { label: 'Đội ngũ Người giúp việc', path: '/enterprise', icon: Users, badge: '42' },
-    { label: 'Lịch ca & Hợp đồng', path: '/enterprise', icon: CalendarCheck },
-    { label: 'Quản lý Dịch vụ cung cấp', path: '/enterprise', icon: Briefcase },
-    { label: 'Báo cáo Doanh thu', path: '/enterprise', icon: FileCheck },
-    { label: 'Cài đặt Doanh nghiệp', path: '/enterprise', icon: Settings },
+    { label: 'Đội ngũ Nhân sự B2B', path: '/enterprise', icon: Users, badge: `${employees.length}` },
+    { label: 'Lịch ca & Hợp đồng', path: '/enterprise', icon: CalendarCheck, badge: companyBookings.length > 0 ? `${companyBookings.length}` : null },
+    { label: 'Ví & Doanh thu Sàn', path: '/enterprise', icon: DollarSign },
   ];
+
+  const availableBalance = walletData?.wallet?.available ?? (currentUser?.wallet?.available || 0);
 
   return (
     <DashboardLayout
-      roleBadge="Doanh nghiệp (/enterprise)"
+      roleBadge="Doanh nghiệp B2B (/enterprise)"
       roleColor="amber"
       sidebarNav={enterpriseNav}
       pageTitle="Quản trị Đối tác Doanh nghiệp"
-      pageSubtitle="Điều phối nhân sự giúp việc và quản lý lịch thực hiện dịch vụ"
+      pageSubtitle="Nhận ca từ sàn, phân công nhân sự và quyết toán doanh thu chiết khấu 12%"
     >
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-amber-600 to-orange-500 rounded-3xl p-6 sm:p-8 text-white shadow-md mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="inline-block bg-white/20 text-xs font-bold px-3 py-1 rounded-full mb-2">
-            Đối tác Doanh Nghiệp
+            Đối tác Doanh Nghiệp B2B
           </div>
           <h1 className="text-2xl sm:text-3xl font-black">
-            Công ty Dịch vụ Vệ sinh CleanPro
+            {currentUser?.name || user?.name || 'Công ty Dịch vụ Vệ sinh CleanPro'}
           </h1>
           <p className="text-amber-100 text-sm mt-1 max-w-xl">
-            Quản lý đội ngũ nhân sự giúp việc, phân phối ca làm việc và theo dõi hiệu suất công việc.
+            Nhận ca trên Chợ việc làm, gán nhân viên phụ trách và hưởng tỷ lệ thực nhận 88% (phí sàn ưu đãi 12%).
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button className="bg-white text-slate-900 px-5 py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-slate-50 flex items-center gap-1.5 transition-all">
-            <PlusCircle className="w-4 h-4 text-amber-600" />
-            <span>Thêm nhân sự mới</span>
-          </button>
+        <div className="bg-white/10 backdrop-blur-xs px-5 py-3 rounded-2xl border border-white/20 text-center">
+          <div className="text-xs text-amber-200 uppercase font-semibold">Phí sàn B2B ưu đãi</div>
+          <div className="text-2xl font-black text-white mt-0.5">88% Doanh thu</div>
+          <div className="text-[11px] text-amber-100">Ví khả dụng: {formatVND(availableBalance)}</div>
         </div>
       </div>
 
-      {/* Stats Row */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+        <div 
+          onClick={() => setActiveTab('EMPLOYEES')} 
+          className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-amber-400 transition-all"
+        >
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Nhân sự thuộc công ty</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Nhân sự công ty</span>
             <Users className="w-5 h-5 text-amber-600" />
           </div>
-          <div className="text-3xl font-black text-slate-900">42 người</div>
-          <p className="text-xs text-slate-500 mt-1">38 người đang trực tuyến nhận ca</p>
+          <div className="text-3xl font-black text-slate-900">{employees.length} nhân viên</div>
+          <p className="text-xs text-slate-500 mt-1">Sẵn sàng nhận phân công</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+        <div 
+          onClick={() => setActiveTab('MARKET')} 
+          className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-purple-400 transition-all"
+        >
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Lịch hẹn đang thực hiện</span>
-            <CalendarCheck className="w-5 h-5 text-blue-600" />
-          </div>
-          <div className="text-3xl font-black text-slate-900">18 ca</div>
-          <p className="text-xs text-blue-600 font-semibold mt-1">Tất cả nhân sự đúng giờ</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Doanh thu tháng này</span>
-            <DollarSign className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div className="text-3xl font-black text-slate-900">84.500.000đ</div>
-          <p className="text-xs text-emerald-600 font-semibold mt-1">+18.4% tăng trưởng</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Thời gian đáp ứng TB</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Đơn trên chợ chờ nhận</span>
             <Clock className="w-5 h-5 text-purple-600" />
           </div>
-          <div className="text-3xl font-black text-slate-900">15 phút</div>
-          <p className="text-xs text-slate-500 mt-1">Từ lúc khách gửi yêu cầu</p>
+          <div className="text-3xl font-black text-purple-600">{openBookings.length} ca</div>
+          <p className="text-xs text-slate-500 mt-1">Có thể bấm nhận ngay</p>
+        </div>
+
+        <div 
+          onClick={() => setActiveTab('SCHEDULE')} 
+          className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-blue-400 transition-all"
+        >
+          <div className="flex items-center justify-between text-slate-500 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider">Ca công ty đã nhận</span>
+            <CalendarCheck className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="text-3xl font-black text-slate-900">{companyBookings.length} ca</div>
+          <p className="text-xs text-blue-600 font-semibold mt-1">Đang điều phối & thực hiện</p>
+        </div>
+
+        <div 
+          onClick={() => setActiveTab('WALLET')} 
+          className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-emerald-400 transition-all"
+        >
+          <div className="flex items-center justify-between text-slate-500 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider">Số dư ví khả dụng</span>
+            <DollarSign className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div className="text-3xl font-black text-emerald-600">{formatVND(availableBalance)}</div>
+          <p className="text-xs text-slate-500 mt-1">Bấm để quản lý ví & rút tiền</p>
         </div>
       </div>
 
-      {/* Helper Assignment Demo Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h3 className="font-bold text-slate-900 text-base">
-              Điều phối đội ngũ nhân viên giúp việc
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">Trạng thái sẵn sàng và các ca đang thực hiện</p>
-          </div>
-          <span className="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-bold">
-            Dữ liệu mẫu demo
-          </span>
-        </div>
-        
-        <div className="space-y-3">
-          <div className="p-4 rounded-xl border border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-slate-50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 font-bold flex items-center justify-center">
-                ML
-              </div>
-              <div>
-                <div className="font-bold text-slate-900 text-sm">Mai Thị Liên</div>
-                <div className="text-xs text-slate-500">Chuyên môn: Dọn dẹp công nghiệp, giặt ủi</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="bg-emerald-50 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-bold">
-                Đang rảnh (Sẵn sàng nhận ca)
-              </span>
-              <button className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold">
-                Giao ca
-              </button>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl border border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-slate-50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center">
-                TH
-              </div>
-              <div>
-                <div className="font-bold text-slate-900 text-sm">Trần Văn Hùng</div>
-                <div className="text-xs text-slate-500">Chuyên môn: Sửa chữa điện nước gia đình, vệ sinh máy lạnh</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="bg-amber-50 text-amber-700 text-xs px-2.5 py-1 rounded-full font-bold">
-                Đang làm việc (Quận 1, hoàn thành lúc 16:30)
-              </span>
-              <button className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-xs font-bold">
-                Theo dõi
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Main Tab Navigation */}
+      <div className="flex items-center gap-2 border-b border-slate-200 mb-6 pb-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('MARKET')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === 'MARKET' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Briefcase className="w-4 h-4" />
+          <span>Chợ việc làm B2B ({openBookings.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('SCHEDULE')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === 'SCHEDULE' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <CalendarCheck className="w-4 h-4" />
+          <span>Lịch ca & Hợp đồng ({companyBookings.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('EMPLOYEES')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === 'EMPLOYEES' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Đội ngũ Nhân sự ({employees.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('WALLET')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === 'WALLET' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <DollarSign className="w-4 h-4" />
+          <span>Ví & Doanh thu B2B</span>
+        </button>
       </div>
+
+      {/* Tab Panels */}
+      {activeTab === 'MARKET' && (
+        <MarketTab
+          openBookings={openBookings}
+          employees={employees}
+          isLoading={isLoading}
+          onRefresh={fetchData}
+          onBookingClaimed={() => {
+            fetchData();
+            setActiveTab('SCHEDULE');
+          }}
+          onNavigateToEmployees={() => setActiveTab('EMPLOYEES')}
+        />
+      )}
+
+      {activeTab === 'SCHEDULE' && (
+        <ScheduleTab
+          companyBookings={companyBookings}
+          isLoading={isLoading}
+          onRefresh={fetchData}
+        />
+      )}
+
+      {activeTab === 'EMPLOYEES' && (
+        <EmployeesTab
+          employees={employees}
+          onRefresh={fetchData}
+        />
+      )}
+
+      {activeTab === 'WALLET' && (
+        <WalletTab
+          availableBalance={availableBalance}
+          bankInfo={currentUser?.bank}
+          onRefresh={fetchData}
+        />
+      )}
     </DashboardLayout>
   );
 };
