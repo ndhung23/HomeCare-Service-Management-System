@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Building2, UserCheck, User, ArrowLeft, Lock, Mail, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Lock, Mail } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, mockAccounts } = useAuth();
+  const { login } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,29 +32,6 @@ const Login = () => {
       setErrorMessage(apiMessage);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleQuickLogin = async (role) => {
-    setErrorMessage('');
-    setIsLoading(true);
-    try {
-      const loggedUser = await login(role);
-      navigate(loggedUser.redirectPath || loggedUser.dashboardPath || '/');
-    } catch (err) {
-      console.error('Quick login error:', err);
-      setErrorMessage('Không thể đăng nhập bằng tài khoản mẫu này.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getRoleIcon = (role) => {
-    switch (role) {
-      case 'admin': return <Shield className="w-5 h-5 text-indigo-600" />;
-      case 'enterprise': return <Building2 className="w-5 h-5 text-amber-600" />;
-      case 'helper': return <UserCheck className="w-5 h-5 text-emerald-600" />;
-      default: return <User className="w-5 h-5 text-blue-600" />;
     }
   };
 
@@ -96,38 +73,8 @@ const Login = () => {
             Chào mừng bạn quay trở lại!
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Chọn tài khoản mẫu để test nhanh hoặc nhập email/mật khẩu
+            Đăng nhập để quản lý dịch vụ và đơn hàng của bạn
           </p>
-        </div>
-
-        {/* Quick Mock Role Switcher (For Testing Roles) */}
-        <div className="mb-6 bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
-          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-blue-600" />
-            <span>Chọn nhanh vai trò để test luồng (1-Click)</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {mockAccounts.map((acc) => (
-              <button
-                key={acc.role}
-                type="button"
-                onClick={() => handleQuickLogin(acc.role)}
-                className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left group"
-              >
-                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 group-hover:bg-white shadow-xs">
-                  {getRoleIcon(acc.role)}
-                </div>
-                <div className="overflow-hidden">
-                  <div className="text-xs font-bold text-slate-900 group-hover:text-blue-600 truncate">
-                    {acc.label}
-                  </div>
-                  <div className="text-[10px] text-slate-400 truncate">
-                    {acc.redirectPath}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Regular Login Form */}
