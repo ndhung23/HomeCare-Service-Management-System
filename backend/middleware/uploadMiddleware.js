@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -38,23 +39,28 @@ const diskStorage = multer.diskStorage({
 const storage = hasCloudinary
   ? new CloudinaryStorage({
       cloudinary,
-      params: {
-        folder: 'giupviec24',
-        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+      params: async (req, file) => {
+        const isVideo = file.mimetype.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(file.originalname);
+        const cleanName = file.originalname.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9]/g, '_');
+        return {
+          folder: 'giupviec24/evidence',
+          resource_type: isVideo ? 'video' : 'auto',
+          public_id: `${Date.now()}-${cleanName}`,
+        };
       },
     })
   : diskStorage;
 
 export const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit (Role.md)
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for images & videos
   fileFilter: (req, file, cb) => {
-    const allowed = /jpeg|jpg|png|webp|mp4|mov/;
+    const allowed = /jpeg|jpg|png|webp|mp4|mov|webm/;
     const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
     if (allowed.test(ext) || allowed.test(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Chỉ chấp nhận file ảnh (jpg, png, webp) hoặc video ngắn dưới 10MB!'));
+      cb(new Error('Chỉ chấp nhận file ảnh (jpg, png, webp) hoặc video (mp4, mov, webm)!'));
     }
   },
 });
@@ -63,6 +69,9 @@ export const getFileUrl = (req, file) => {
   if (!file) return '';
   if (file.path && (file.path.startsWith('http://') || file.path.startsWith('https://'))) {
     return file.path;
+  }
+  if (file.secure_url) {
+    return file.secure_url;
   }
   // Local file fallback
   const host = req.get('host');

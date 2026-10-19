@@ -7,7 +7,7 @@ import {
   toggleLockUser,
   getAdminStats,
 } from '../controllers/adminController.js';
-import { confirmPaymentByAdmin } from '../controllers/paymentController.js';
+import { confirmPaymentByAdmin, getAdminPaymentsList, rejectPaymentByAdmin } from '../controllers/paymentController.js';
 import {
   getAdminWithdrawRequests,
   approveWithdrawRequest,
@@ -32,8 +32,10 @@ router.get('/kyc/pending', getPendingKycList);
 router.put('/kyc/:userId/approve', approveKyc);
 router.put('/kyc/:userId/reject', rejectKyc);
 
-// Quản lý thanh toán
+// Quản lý duyệt thanh toán (VietQR đối soát / VNPay sau này)
+router.get('/payments', getAdminPaymentsList);
 router.put('/bookings/:id/confirm-payment', confirmPaymentByAdmin);
+router.put('/bookings/:id/reject-payment', rejectPaymentByAdmin);
 
 // Quản lý lệnh rút tiền
 router.get('/withdraws', getAdminWithdrawRequests);

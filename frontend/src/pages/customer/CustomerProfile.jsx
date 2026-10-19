@@ -490,12 +490,19 @@ const CustomerProfile = () => {
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
-              {evidenceModalPhotos.map((url, i) => (
-                <a key={i} href={url} target="_blank" rel="noreferrer" className="rounded-xl overflow-hidden border">
-                  <img src={url} alt={`Evidence ${i + 1}`} className="w-full h-44 object-cover hover:scale-105 transition-transform" />
-                </a>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+              {evidenceModalPhotos.map((url, i) => {
+                const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(url) || url.includes('/video/upload/');
+                return isVideo ? (
+                  <div key={i} className="rounded-xl overflow-hidden border bg-black">
+                    <video controls src={url} className="w-full h-44 object-cover" />
+                  </div>
+                ) : (
+                  <a key={i} href={url} target="_blank" rel="noreferrer" className="rounded-xl overflow-hidden border block bg-slate-50">
+                    <img src={url} alt={`Evidence ${i + 1}`} className="w-full h-44 object-cover hover:scale-105 transition-transform" />
+                  </a>
+                );
+              })}
             </div>
           </div>
         </div>

@@ -36,11 +36,15 @@ const ScheduleTab = ({ companyBookings = [], isLoading = false, onRefresh }) => 
   const handleEvidenceFileChange = (e) => {
     const files = Array.from(e.target.files || []);
     if (evidenceFiles.length + files.length > 5) {
-      alert('Tối đa 5 ảnh bằng chứng hoàn thành ca!');
+      alert('Tối đa 5 ảnh hoặc video bằng chứng hoàn thành ca!');
       return;
     }
     setEvidenceFiles((prev) => [...prev, ...files]);
-    const previews = files.map((f) => URL.createObjectURL(f));
+    const previews = files.map((f) => ({
+      url: URL.createObjectURL(f),
+      isVideo: f.type.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(f.name),
+      name: f.name,
+    }));
     setEvidencePreviews((prev) => [...prev, ...previews]);
   };
 
@@ -189,11 +193,11 @@ const ScheduleTab = ({ companyBookings = [], isLoading = false, onRefresh }) => 
             <form onSubmit={handleCompleteSubmit} className="space-y-4 mt-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Ảnh bằng chứng sau khi hoàn tất (Tối đa 5 ảnh) <span className="text-red-500">*</span>
+                  Ảnh hoặc video bằng chứng sau khi hoàn tất (Tối đa 5 tệp - Cloudinary) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   multiple
                   onChange={handleEvidenceFileChange}
                   className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
@@ -202,8 +206,14 @@ const ScheduleTab = ({ companyBookings = [], isLoading = false, onRefresh }) => 
 
               {evidencePreviews.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
-                  {evidencePreviews.map((src, idx) => (
-                    <img key={idx} src={src} alt="Evidence" className="w-full h-20 object-cover rounded-xl border border-slate-200" />
+                  {evidencePreviews.map((p, idx) => (
+                    <div key={idx} className="w-full h-20 rounded-xl overflow-hidden border border-slate-200 bg-black/5">
+                      {p?.isVideo ? (
+                        <video src={p.url} className="w-full h-full object-cover" muted />
+                      ) : (
+                        <img src={p?.url || p} alt="Evidence" className="w-full h-full object-cover" />
+                      )}
+                    </div>
                   ))}
                 </div>
               )}

@@ -118,3 +118,74 @@ export const confirmPaymentByAdmin = async (req, res) => {
   }
 };
 
+// Danh sách các khoản thanh toán chờ duyệt & đã duyệt cho Admin
+export const getAdminPaymentsList = async (req, res) => {
+  try {
+    const { status = 'AWAITING_PAYMENT', search = '' } = req.query;
+    let query = {};
+    if (status === 'AWAITING_PAYMENT') {
+      query.status = 'AWAITING_PAYMENT';
+    } else if (status === 'COMPLETED') {
+      query.status = 'COMPLETED';
+    } else if (status === 'ALL') {
+      query.status = { $in: ['AWAITING_PAYMENT', 'COMPLETED'] };
+    }
+
+    if (search) {
+      query.$or = [
+        { bookingCode: { $regex: search, $options: 'i' } },
+        { customerName: { $regex: search, $options: 'i' } },
+        { customerPhone: { $regex: search, $options: 'i' } },
+        { helper: { $regex: search, $options: 'i' } },
+        { service: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const bookings = await Booking.find(query)
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    res.json(bookings);
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi tải danh sách thanh toán', error: error.message });
+  }
+};
+
+// Admin từ chối thanh toán / Yêu cầu chuyển khoản lại
+export const rejectPaymentByAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = 'Chưa nhận được tiền chuyển khoản khớp với mã đơn' } = req.body;
+    const booking = await Booking.findById(id);
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn dịch vụ' });
+    }
+
+    if (booking.status === 'COMPLETED') {
+      return res.status(400).json({ message: 'Đơn này đã được xác nhận thanh toán rồi, không thể từ chối!' });
+    }
+
+    booking.paymentNote = reason;
+    await booking.save();
+
+    if (booking.customerId) {
+      await Notification.create({
+        userId: booking.customerId,
+        title: 'Đối soát thanh toán chưa thành công',
+        message: `Admin đối soát đơn ${booking.bookingCode}: "${reason}". Vui lòng kiểm tra lại sao kê và liên hệ hỗ trợ.`,
+        type: 'PAYMENT',
+        link: '/customer',
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      message: `Đã gửi cảnh báo đối soát cho khách hàng đơn ${booking.bookingCode}`,
+      booking,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi từ chối thanh toán', error: error.message });
+  }
+};
+

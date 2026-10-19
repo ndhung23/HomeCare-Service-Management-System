@@ -37,12 +37,16 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files || []);
     if (evidenceFiles.length + files.length > 5) {
-      alert('Tối đa 5 ảnh bằng chứng hoàn thành ca!');
+      alert('Tối đa 5 ảnh/video bằng chứng hoàn thành ca!');
       return;
     }
     const newFiles = [...evidenceFiles, ...files];
     setEvidenceFiles(newFiles);
-    const newPreviews = files.map((f) => URL.createObjectURL(f));
+    const newPreviews = files.map((f) => ({
+      url: URL.createObjectURL(f),
+      isVideo: f.type.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(f.name),
+      name: f.name,
+    }));
     setEvidencePreviews((prev) => [...prev, ...newPreviews]);
   };
 
@@ -252,21 +256,25 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
             </div>
 
             <p className="text-xs text-slate-600">
-              Quy định bắt buộc: Tải lên tối thiểu <strong>1 ảnh/video</strong> chụp hiện trạng phòng/nhà sau khi đã dọn dẹp sạch sẽ (tối đa 5 ảnh, mỗi tệp &lt; 10MB).
+              Quy định bắt buộc: Tải lên tối thiểu <strong>1 ảnh hoặc video ngắn</strong> chụp hiện trạng nhà sau khi hoàn tất dọn dẹp (tối đa 5 tệp, lưu trữ đám mây Cloudinary).
             </p>
 
             <div className="space-y-3">
               <label className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-6 text-center cursor-pointer block bg-slate-50/50">
                 <Upload className="w-8 h-8 mx-auto text-slate-400 mb-2" />
-                <span className="text-xs font-bold text-blue-600">Chọn ảnh bằng chứng từ thiết bị</span>
-                <input type="file" multiple accept="image/*" onChange={handleFileChange} className="hidden" />
+                <span className="text-xs font-bold text-blue-600">Chọn ảnh hoặc video bằng chứng từ thiết bị</span>
+                <input type="file" multiple accept="image/*,video/*" onChange={handleFileChange} className="hidden" />
               </label>
 
               {evidencePreviews.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-2">
                   {evidencePreviews.map((preview, idx) => (
-                    <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border">
-                      <img src={preview} alt="Evidence" className="w-full h-full object-cover" />
+                    <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border bg-black/5">
+                      {preview?.isVideo ? (
+                        <video src={preview.url} className="w-full h-full object-cover" muted />
+                      ) : (
+                        <img src={preview?.url || preview} alt="Evidence" className="w-full h-full object-cover" />
+                      )}
                       <button
                         type="button"
                         onClick={() => removeFile(idx)}

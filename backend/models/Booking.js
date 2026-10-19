@@ -199,6 +199,9 @@ const bookingSchema = new mongoose.Schema(
 bookingSchema.virtual('id').get(function () {
   return this.bookingCode || this._id.toHexString();
 });
+bookingSchema.virtual('evidencePhotos').get(function () {
+  return this.evidence || [];
+});
 bookingSchema.set('toJSON', { virtuals: true });
 bookingSchema.set('toObject', { virtuals: true });
 

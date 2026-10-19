@@ -6,7 +6,11 @@ import {
   CreditCard,
   DollarSign,
   Search,
-  RefreshCw
+  RefreshCw,
+  QrCode,
+  X,
+  Play,
+  CheckCircle2
 } from 'lucide-react';
 import adminApi from '../../api/adminApi';
 import bookingApi from '../../api/bookingApi';
@@ -19,7 +23,11 @@ const AdminDashboard = () => {
 
   // Tab 1: Payments state
   const [awaitingBookings, setAwaitingBookings] = useState([]);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [paymentSubTab, setPaymentSubTab] = useState('AWAITING'); // 'AWAITING' | 'HISTORY'
+  const [paymentSearch, setPaymentSearch] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(null);
+  const [activeEvidenceModal, setActiveEvidenceModal] = useState(null);
 
   // Tab 2: KYC state
   const [pendingKycList, setPendingKycList] = useState([]);
@@ -48,6 +56,15 @@ const AdminDashboard = () => {
     try {
       const data = await bookingApi.getBookings({ status: 'AWAITING_PAYMENT' });
       setAwaitingBookings(data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchPaymentHistory = async () => {
+    try {
+      const data = await bookingApi.getBookings({ status: 'COMPLETED' });
+      setPaymentHistory(data || []);
     } catch (err) {
       console.error(err);
     }
@@ -83,6 +100,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchStats();
     fetchAwaitingPayments();
+    fetchPaymentHistory();
     fetchPendingKyc();
     fetchWithdraws();
     fetchUsers();
@@ -97,11 +115,25 @@ const AdminDashboard = () => {
       const res = await adminApi.confirmPayment(bookingId);
       alert(res.message || 'Xác nhận thanh toán và giải ngân thành công!');
       fetchAwaitingPayments();
+      fetchPaymentHistory();
       fetchStats();
     } catch (err) {
       alert(err.response?.data?.message || 'Có lỗi khi xác nhận thanh toán');
     } finally {
       setIsProcessingPayment(null);
+    }
+  };
+
+  const handleRejectPayment = async (bookingId, bookingCode) => {
+    const reason = window.prompt(`Nhập lý do chưa xác nhận/yêu cầu kiểm tra lại thanh toán ca ${bookingCode}:`, 'Chưa nhận được tiền chuyển khoản hoặc sai cú pháp chuyển khoản');
+    if (!reason) return;
+    try {
+      await adminApi.rejectPayment(bookingId, reason);
+      alert('Đã gửi thông báo yêu cầu đối soát lại cho khách hàng!');
+      fetchAwaitingPayments();
+      fetchStats();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Có lỗi khi thao tác');
     }
   };
 
@@ -166,7 +198,7 @@ const AdminDashboard = () => {
   };
 
   const adminNav = [
-    { key: 'PAYMENT', label: 'Xác nhận thanh toán', active: activeTab === 'PAYMENT', onClick: () => setActiveTab('PAYMENT'), icon: DollarSign, badge: awaitingBookings.length > 0 ? `${awaitingBookings.length}` : null },
+    { key: 'PAYMENT', label: 'Duyệt thanh toán', active: activeTab === 'PAYMENT', onClick: () => setActiveTab('PAYMENT'), icon: DollarSign, badge: awaitingBookings.length > 0 ? `${awaitingBookings.length}` : null },
     { key: 'KYC', label: 'Duyệt CCCD (KYC)', active: activeTab === 'KYC', onClick: () => setActiveTab('KYC'), icon: ShieldCheck, badge: pendingKycList.length > 0 ? `${pendingKycList.length}` : null },
     { key: 'WITHDRAW', label: 'Duyệt lệnh rút tiền', active: activeTab === 'WITHDRAW', onClick: () => setActiveTab('WITHDRAW'), icon: CreditCard, badge: withdraws.length > 0 ? `${withdraws.length}` : null },
     { key: 'USERS', label: 'Quản lý người dùng', active: activeTab === 'USERS', onClick: () => setActiveTab('USERS'), icon: Users, badge: users.length > 0 ? `${users.length}` : null },
@@ -249,7 +281,7 @@ const AdminDashboard = () => {
             activeTab === 'PAYMENT' ? 'bg-amber-600 text-white shadow-xs' : 'bg-white border text-slate-700 hover:bg-slate-50'
           }`}
         >
-          <span>Xác nhận thanh toán đơn</span>
+          <span>Duyệt thanh toán</span>
           {awaitingBookings.length > 0 && (
             <span className="bg-white text-amber-700 text-[10px] px-1.5 py-0.5 rounded-full font-black">
               {awaitingBookings.length}
@@ -295,66 +327,297 @@ const AdminDashboard = () => {
         </button>
       </div>
 
-      {/* Tab 1: Payment Confirmation */}
+      {/* Tab 1: Payment Approval & Auditing */}
       {activeTab === 'PAYMENT' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
-          <div className="flex items-center justify-between border-b pb-3">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900">Danh sách đơn chờ xác nhận tiền chuyển khoản</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Sau khi kiểm tra tài khoản nhận được tiền quét VietQR, bấm xác nhận để tự động cộng tiền vào ví người giúp việc</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black text-slate-900">Quản lý duyệt thanh toán & Đối soát</h3>
+                <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  VietQR Chuyển khoản
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Đối soát tiền khách đã chuyển khoản qua VietQR, phê duyệt để giải ngân ví người làm hoặc yêu cầu kiểm tra lại
+              </p>
             </div>
-            <button onClick={fetchAwaitingPayments} className="p-1 hover:bg-slate-100 rounded-lg text-slate-500">
-              <RefreshCw className="w-4 h-4" />
+            <button
+              onClick={() => { fetchAwaitingPayments(); fetchPaymentHistory(); fetchStats(); }}
+              className="p-2 border rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-600 flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Làm mới</span>
             </button>
           </div>
 
-          {awaitingBookings.length === 0 ? (
-            <div className="text-center py-10 text-xs text-slate-400">Không có đơn nào đang chờ xác nhận thanh toán</div>
-          ) : (
-            <div className="space-y-3">
-              {awaitingBookings.map((b) => (
-                <div key={b._id} className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-black text-blue-600 text-xs">{b.bookingCode}</span>
-                      <span className="font-bold text-slate-900 text-sm">{b.service}</span>
-                    </div>
-                    <div className="text-xs text-slate-600">
-                      Khách hàng: <strong>{b.customerName}</strong> ({b.customerPhone}) • Người làm: <strong>{b.helper}</strong>
-                    </div>
-                    <div className="text-xs text-slate-400">
-                      Thời gian: {b.date} • {b.time} ({b.durationHours}h) • Địa chỉ: {b.address}
-                    </div>
-                    {b.evidence && b.evidence.length > 0 && (
-                      <div className="pt-1 flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-500">Ảnh nghiệm thu:</span>
-                        {b.evidence.map((url, i) => (
-                          <a key={i} href={url} target="_blank" rel="noreferrer" className="w-6 h-6 rounded border overflow-hidden">
-                            <img src={url} alt="Evidence" className="w-full h-full object-cover" />
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="text-right flex md:flex-col items-center md:items-end justify-between gap-2">
-                    <div>
-                      <div className="text-[10px] text-slate-400">Tổng tiền khách trả:</div>
-                      <div className="text-base font-black text-blue-700">{b.price || formatVND(b.totalPrice)}</div>
-                      <div className="text-[11px] text-emerald-600 font-bold">
-                        Giải ngân ví: {formatVND(b.pricingSnapshot?.helperEarnings || Math.round(b.totalPrice * 0.8))}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleConfirmPayment(b._id)}
-                      disabled={isProcessingPayment === b._id}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs"
-                    >
-                      {isProcessingPayment === b._id ? 'Đang giải ngân...' : 'Xác nhận đã nhận tiền'}
-                    </button>
-                  </div>
+          {/* Integration Notice Banner */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <QrCode className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-blue-900">
+                  Cơ chế thanh toán hiện tại: VietQR Chuyển khoản ngân hàng (MB Bank)
                 </div>
-              ))}
+                <div className="text-[11px] text-blue-700 mt-0.5">
+                  Khách quét QR theo mã đơn &rarr; Tiền về tài khoản nền tảng &rarr; Admin đối soát và bấm Duyệt &rarr; Ví cộng tự động 80% (CTV) hoặc 88% (Doanh nghiệp).
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0">
+              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold bg-white text-indigo-700 border border-indigo-200 shadow-xs">
+                <span>⚡ Cổng tự động (VNPay / MoMo): Sắp ra mắt</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Sub-tabs & Search Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl w-fit">
+              <button
+                onClick={() => setPaymentSubTab('AWAITING')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  paymentSubTab === 'AWAITING' ? 'bg-white text-amber-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>Chờ duyệt thanh toán</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-700">
+                  {awaitingBookings.length}
+                </span>
+              </button>
+              <button
+                onClick={() => setPaymentSubTab('HISTORY')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  paymentSubTab === 'HISTORY' ? 'bg-white text-emerald-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>Lịch sử đã duyệt</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-700">
+                  {paymentHistory.length}
+                </span>
+              </button>
+            </div>
+
+            <div className="relative w-full sm:w-72">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={paymentSearch}
+                onChange={(e) => setPaymentSearch(e.target.value)}
+                placeholder="Tìm mã đơn, khách hàng, người làm..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs outline-none focus:border-blue-500 bg-slate-50 focus:bg-white"
+              />
+            </div>
+          </div>
+
+          {/* Sub-tab 1: Awaiting Payment Approval */}
+          {paymentSubTab === 'AWAITING' && (
+            <div>
+              {awaitingBookings.filter((b) => {
+                if (!paymentSearch) return true;
+                const term = paymentSearch.toLowerCase();
+                return (
+                  (b.bookingCode && b.bookingCode.toLowerCase().includes(term)) ||
+                  (b.customerName && b.customerName.toLowerCase().includes(term)) ||
+                  (b.customerPhone && b.customerPhone.includes(term)) ||
+                  (b.helper && b.helper.toLowerCase().includes(term)) ||
+                  (b.service && b.service.toLowerCase().includes(term))
+                );
+              }).length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed border-slate-100 rounded-2xl text-xs text-slate-400">
+                  Không có đơn nào đang chờ duyệt thanh toán
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {awaitingBookings
+                    .filter((b) => {
+                      if (!paymentSearch) return true;
+                      const term = paymentSearch.toLowerCase();
+                      return (
+                        (b.bookingCode && b.bookingCode.toLowerCase().includes(term)) ||
+                        (b.customerName && b.customerName.toLowerCase().includes(term)) ||
+                        (b.customerPhone && b.customerPhone.includes(term)) ||
+                        (b.helper && b.helper.toLowerCase().includes(term)) ||
+                        (b.service && b.service.toLowerCase().includes(term))
+                      );
+                    })
+                    .map((b) => {
+                      const evidenceList = b.evidence || b.evidencePhotos || [];
+                      const helperEarnings = b.pricingSnapshot?.helperEarnings || Math.round((b.totalPrice || 0) * 0.8);
+                      const platformFee = b.pricingSnapshot?.platformFee || Math.round((b.totalPrice || 0) * 0.2);
+                      const feePercent = Math.round((b.pricingSnapshot?.feeRate || (b.assigneeType === 'ENTERPRISE' ? 0.12 : 0.20)) * 100);
+
+                      return (
+                        <div key={b._id} className="p-5 rounded-2xl border border-slate-200 hover:border-amber-300 transition-all bg-white shadow-xs space-y-4">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-700">#{b.bookingCode}</span>
+                                <span className="font-black text-slate-900 text-sm">{b.service}</span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                                  Chờ duyệt tiền VietQR
+                                </span>
+                              </div>
+                              <div className="text-xs text-slate-500 mt-1">
+                                Thời gian ca: <strong>{b.date} • {b.time}</strong> ({b.durationHours || 2}h) • Địa chỉ: <strong>{b.address}</strong>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-[10px] text-slate-400">Khách cần thanh toán:</div>
+                              <div className="text-lg font-black text-blue-700">{b.price || formatVND(b.totalPrice)}</div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs bg-slate-50/70 p-3.5 rounded-xl border border-slate-100">
+                            <div>
+                              <span className="text-slate-400 block text-[11px]">Khách hàng thanh toán:</span>
+                              <span className="font-bold text-slate-900">{b.customerName || 'Khách vãng lai'}</span>
+                              <div className="text-slate-500 text-[11px]">{b.customerPhone || 'Chưa có SĐT'}</div>
+                            </div>
+
+                            <div>
+                              <span className="text-slate-400 block text-[11px]">Người nhận việc (Hưởng thu nhập):</span>
+                              <span className="font-bold text-slate-900">{b.helper}</span>
+                              <div className="text-slate-500 text-[11px]">{b.helperPhone || 'SĐT người làm'} • {b.assigneeType === 'ENTERPRISE' ? 'Doanh nghiệp (Phí 12%)' : 'CTV Cá nhân (Phí 20%)'}</div>
+                            </div>
+
+                            <div>
+                              <span className="text-slate-400 block text-[11px]">Quyết toán ví khi duyệt:</span>
+                              <div className="font-bold text-emerald-600 text-sm">+{formatVND(helperEarnings)}</div>
+                              <div className="text-[11px] text-slate-500">Phí sàn giữ lại: {formatVND(platformFee)} ({feePercent}%)</div>
+                            </div>
+                          </div>
+
+                          {/* Evidence photos/videos from Cloudinary */}
+                          {evidenceList.length > 0 && (
+                            <div className="space-y-1.5">
+                              <div className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+                                <span>Bằng chứng hoàn thành ca ({evidenceList.length} tệp trên Cloudinary):</span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                {evidenceList.map((url, i) => {
+                                  const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(url) || url.includes('/video/upload/');
+                                  return (
+                                    <button
+                                      key={i}
+                                      type="button"
+                                      onClick={() => setActiveEvidenceModal({ title: `Bằng chứng đơn ${b.bookingCode}`, items: evidenceList })}
+                                      className="relative w-16 h-16 rounded-xl border border-slate-200 overflow-hidden group hover:border-blue-500"
+                                    >
+                                      {isVideo ? (
+                                        <div className="w-full h-full bg-slate-900 flex items-center justify-center text-white">
+                                          <Play className="w-5 h-5 fill-white" />
+                                        </div>
+                                      ) : (
+                                        <img src={url} alt={`Evidence ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                      )}
+                                      <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[9px] text-white text-center py-0.5">
+                                        {isVideo ? 'Video' : `Ảnh ${i + 1}`}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Action Buttons */}
+                          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                            <div className="text-[11px] text-slate-500">
+                              Nội dung đối soát VietQR: <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">{b.bookingCode}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleRejectPayment(b._id, b.bookingCode)}
+                                className="px-3.5 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold rounded-xl transition-all"
+                              >
+                                Báo chưa nhận tiền / Đối soát lại
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleConfirmPayment(b._id)}
+                                disabled={isProcessingPayment === b._id}
+                                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>{isProcessingPayment === b._id ? 'Đang giải ngân...' : 'Duyệt thanh toán & Giải ngân ví'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sub-tab 2: History of Approved Payments */}
+          {paymentSubTab === 'HISTORY' && (
+            <div>
+              {paymentHistory.filter((b) => {
+                if (!paymentSearch) return true;
+                const term = paymentSearch.toLowerCase();
+                return (
+                  (b.bookingCode && b.bookingCode.toLowerCase().includes(term)) ||
+                  (b.customerName && b.customerName.toLowerCase().includes(term)) ||
+                  (b.customerPhone && b.customerPhone.includes(term)) ||
+                  (b.helper && b.helper.toLowerCase().includes(term)) ||
+                  (b.service && b.service.toLowerCase().includes(term))
+                );
+              }).length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed border-slate-100 rounded-2xl text-xs text-slate-400">
+                  Chưa có lịch sử thanh toán nào phù hợp
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {paymentHistory
+                    .filter((b) => {
+                      if (!paymentSearch) return true;
+                      const term = paymentSearch.toLowerCase();
+                      return (
+                        (b.bookingCode && b.bookingCode.toLowerCase().includes(term)) ||
+                        (b.customerName && b.customerName.toLowerCase().includes(term)) ||
+                        (b.customerPhone && b.customerPhone.includes(term)) ||
+                        (b.helper && b.helper.toLowerCase().includes(term)) ||
+                        (b.service && b.service.toLowerCase().includes(term))
+                      );
+                    })
+                    .map((b) => {
+                      const helperEarnings = b.pricingSnapshot?.helperEarnings || Math.round((b.totalPrice || 0) * 0.8);
+                      const platformFee = b.pricingSnapshot?.platformFee || Math.round((b.totalPrice || 0) * 0.2);
+
+                      return (
+                        <div key={b._id} className="p-4 rounded-xl border border-slate-200 bg-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-700">#{b.bookingCode}</span>
+                              <span className="font-bold text-slate-900 text-sm">{b.service}</span>
+                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Đã duyệt thanh toán
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-600">
+                              Khách hàng: <strong>{b.customerName}</strong> • Người nhận việc: <strong>{b.helper}</strong>
+                            </div>
+                            <div className="text-[11px] text-slate-400">
+                              Đã giải ngân: <strong>{formatVND(helperEarnings)}</strong> • Phí sàn thu: <strong>{formatVND(platformFee)}</strong>
+                              {b.paidAt && <span> • Ngày duyệt: {new Date(b.paidAt).toLocaleDateString('vi-VN')}</span>}
+                            </div>
+                          </div>
+
+                          <div className="text-right flex items-center md:flex-col items-end justify-between">
+                            <div className="text-xs font-bold text-slate-400">Tổng tiền đã thu:</div>
+                            <div className="text-base font-black text-slate-900">{b.price || formatVND(b.totalPrice)}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -575,6 +838,34 @@ const AdminDashboard = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Cloud Evidence Photos & Videos Modal */}
+      {activeEvidenceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="text-sm font-black text-slate-900">{activeEvidenceModal.title}</h3>
+              <button onClick={() => setActiveEvidenceModal(null)} className="p-1 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+              {activeEvidenceModal.items.map((url, i) => {
+                const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(url) || url.includes('/video/upload/');
+                return isVideo ? (
+                  <div key={i} className="rounded-xl overflow-hidden border bg-black">
+                    <video controls src={url} className="w-full h-48 object-cover" />
+                  </div>
+                ) : (
+                  <a key={i} href={url} target="_blank" rel="noreferrer" className="rounded-xl overflow-hidden border block bg-slate-50">
+                    <img src={url} alt={`Evidence ${i + 1}`} className="w-full h-48 object-cover hover:scale-105 transition-transform" />
+                  </a>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
