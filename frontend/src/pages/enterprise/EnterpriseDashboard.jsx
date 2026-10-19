@@ -86,7 +86,7 @@ const EnterpriseDashboard = () => {
 
   return (
     <DashboardLayout
-      roleBadge="Doanh nghiệp B2B (/enterprise)"
+      roleBadge="Doanh nghiệp B2B"
       roleColor="amber"
       sidebarNav={enterpriseNav}
       activeTab={activeTab}

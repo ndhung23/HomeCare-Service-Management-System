@@ -174,7 +174,7 @@ const AdminDashboard = () => {
 
   return (
     <DashboardLayout
-      roleBadge="Admin (/admin)"
+      roleBadge="Quản trị viên"
       roleColor="indigo"
       sidebarNav={adminNav}
       activeTab={activeTab}

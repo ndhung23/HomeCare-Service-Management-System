@@ -224,10 +224,10 @@ const Navbar = () => {
                       >
                         <LayoutDashboard className="w-4 h-4 text-blue-600" />
                         <span>
-                          {user.role === 'admin' ? 'Bảng điều khiển Admin (/admin)' :
-                           user.role === 'enterprise' ? 'Quản lý Doanh nghiệp (/enterprise)' :
-                           user.role === 'helper' ? 'Lịch làm & Thu nhập (/helper)' :
-                           'Quản lý đơn & Hồ sơ (/customer)'}
+                          {user.role === 'admin' ? 'Bảng điều khiển Quản trị' :
+                           user.role === 'enterprise' ? 'Quản lý Doanh nghiệp' :
+                           user.role === 'helper' ? 'Lịch làm & Thu nhập' :
+                           'Quản lý đơn & Hồ sơ'}
                         </span>
                       </Link>
 

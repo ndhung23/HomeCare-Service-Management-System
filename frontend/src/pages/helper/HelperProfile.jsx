@@ -45,7 +45,7 @@ const HelperProfile = () => {
 
   return (
     <DashboardLayout
-      roleBadge="Người giúp việc (/helper)"
+      roleBadge="Người giúp việc"
       roleColor="blue"
       sidebarNav={helperNav}
       activeTab={activeTab}

@@ -123,7 +123,7 @@ const CustomerProfile = () => {
 
   return (
     <DashboardLayout
-      roleBadge="Khách hàng (/customer)"
+      roleBadge="Khách hàng"
       roleColor="blue"
       sidebarNav={customerNav}
       activeTab={activeTab}

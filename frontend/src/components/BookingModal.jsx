@@ -304,7 +304,7 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
                 }}
                 className="w-full py-2.5 px-4 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 flex items-center justify-center gap-1.5 shadow-sm"
               >
-                <span>Xem lịch sử đơn (/customer)</span>
+                <span>Xem lịch sử đơn</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
