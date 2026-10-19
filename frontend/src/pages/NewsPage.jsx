@@ -1,50 +1,19 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import BenefitsBanner from '../components/BenefitsBanner';
 import Footer from '../components/Footer';
 import { Calendar, Clock, ArrowRight } from 'lucide-react';
+import newsApi from '../api/newsApi';
 import '../styles/Home.css';
 
-const newsArticles = [
-  {
-    id: 1,
-    title: 'Top 7 mẹo khử mùi ẩm mốc phòng khách và nhà bếp nhanh chóng',
-    summary: 'Chỉ với những nguyên liệu tự nhiên quen thuộc như giấm trắng, chanh tươi và bã cà phê, bạn có thể đánh bay mùi hôi khó chịu.',
-    category: 'Mẹo vặt gia đình',
-    date: '26/09/2026',
-    readTime: '3 phút đọc',
-    image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: 2,
-    title: 'Kinh nghiệm chọn người giúp việc trông trẻ an toàn, tận tâm',
-    summary: 'Những tiêu chí quan trọng cha mẹ cần lưu ý khi phỏng vấn và kiểm tra kỹ năng của người giúp việc chăm sóc bé.',
-    category: 'Cẩm nang cho mẹ',
-    date: '24/09/2026',
-    readTime: '5 phút đọc',
-    image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: 3,
-    title: 'GiúpViệc24 mở rộng tuyển dụng 200 cộng tác viên tại Hà Nội & TP.HCM',
-    summary: 'Thu nhập hấp dẫn từ 10 - 15 triệu/tháng, thời gian làm việc linh hoạt theo giờ, được đào tạo tay nghề miễn phí.',
-    category: 'Tuyển dụng',
-    date: '20/09/2026',
-    readTime: '4 phút đọc',
-    image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: 4,
-    title: 'Ưu đãi tháng 10: Tặng mã giảm 50.000đ cho khách hàng mới',
-    summary: 'Chương trình tri ân đặc biệt chào đón mùa thu, nhập mã GV24NEW để nhận ngay ưu đãi khi đặt ca giúp việc đầu tiên.',
-    category: 'Khuyến mãi',
-    date: '18/09/2026',
-    readTime: '2 phút đọc',
-    image: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=600&q=80',
-  },
-];
-
 const NewsPage = () => {
+  const [newsArticles, setNewsArticles] = useState([]);
+
+  useEffect(() => {
+    newsApi.getNews()
+      .then((data) => setNewsArticles(data))
+      .catch((err) => console.error('Lỗi khi tải tin tức từ MongoDB:', err));
+  }, []);
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Navbar />

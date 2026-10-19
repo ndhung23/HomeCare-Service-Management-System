@@ -12,21 +12,21 @@ const Login = () => {
   const [selectedRole, setSelectedRole] = useState('customer');
   const [rememberMe, setRememberMe] = useState(true);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email) {
-      // If empty email, use the selected role's mock account
-      const matched = login(selectedRole);
-      navigate(matched.redirectPath);
+      // If empty email, use the selected role's account
+      const matched = await login(selectedRole);
+      navigate(matched.redirectPath || '/');
       return;
     }
-    const loggedUser = login(email, password);
-    navigate(loggedUser.redirectPath);
+    const loggedUser = await login(email, password);
+    navigate(loggedUser.redirectPath || '/');
   };
 
-  const handleQuickLogin = (role) => {
-    const loggedUser = login(role);
-    navigate(loggedUser.redirectPath);
+  const handleQuickLogin = async (role) => {
+    const loggedUser = await login(role);
+    navigate(loggedUser.redirectPath || '/');
   };
 
   const getRoleIcon = (role) => {

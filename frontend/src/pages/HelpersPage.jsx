@@ -1,11 +1,13 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import BenefitsBanner from '../components/BenefitsBanner';
 import Footer from '../components/Footer';
 import Pagination from '../components/Pagination';
 import ServiceFilterSidebar from '../components/ServiceFilterSidebar';
-import { resolveService } from '../mock/servicesData';
+import { resolveService } from '../utils/serviceUtils';
+import workerApi from '../api/workerApi';
+import serviceApi from '../api/serviceApi';
 import {
   Star,
   Heart,
@@ -19,174 +21,6 @@ import {
   Briefcase,
 } from 'lucide-react';
 import '../styles/Home.css';
-
-/*
- * Danh sách người giúp việc hiện có trong hệ thống (mock data).
- * Khi backend có endpoint GET /api/helpers, thay bằng call API + loading state.
- * hourlyRate: mức lương theo giờ (VND) dùng cho bộ lọc + tính tiền khi đặt lịch.
- */
-const helpersList = [
-  {
-    id: 'lan',
-    name: 'Nguyễn Thị Lan',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
-    role: 'Giúp việc dọn dẹp',
-    experienceYears: 3,
-    area: 'Hà Nội',
-    district: 'Cầu Giấy',
-    skills: ['Dọn dẹp', 'Nấu ăn'],
-    hourlyRate: 120000,
-    rating: 4.9,
-    reviewsCount: 56,
-    jobsDone: 128,
-    verified: true,
-    bio: 'Chuyên dọn dẹp căn hộ và nấu bữa cơm gia đình, làm việc đúng giờ, gọn gàng.',
-  },
-  {
-    id: 'huong',
-    name: 'Trần Thị Hương',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80',
-    role: 'Giúp việc dọn dẹp',
-    experienceYears: 5,
-    area: 'Hà Nội',
-    district: 'Đống Đa',
-    skills: ['Dọn dẹp', 'Giặt ủi'],
-    hourlyRate: 150000,
-    rating: 4.8,
-    reviewsCount: 42,
-    jobsDone: 205,
-    verified: true,
-    bio: '5 năm phục vụ các gia đình có trẻ nhỏ, kỹ tính trong phân loại vải và giặt ủi.',
-  },
-  {
-    id: 'mai',
-    name: 'Lê Thị Mai',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=600&q=80',
-    role: 'Người nấu ăn',
-    experienceYears: 4,
-    area: 'TP. Hồ Chí Minh',
-    district: 'Quận 7',
-    skills: ['Nấu ăn', 'Chăm sóc trẻ'],
-    hourlyRate: 140000,
-    rating: 4.9,
-    reviewsCount: 38,
-    jobsDone: 176,
-    verified: true,
-    bio: 'Nấu được món Bắc - Trung - Nam, biết chăm bé ăn dặm và sắp xếp bữa ăn khoa học.',
-  },
-  {
-    id: 'dung',
-    name: 'Phạm Thị Dung',
-    avatar: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&w=600&q=80',
-    role: 'Chăm sóc người cao tuổi',
-    experienceYears: 6,
-    area: 'Hà Nội',
-    district: 'Hai Bà Trưng',
-    skills: ['Chăm sóc người già', 'Dọn dẹp'],
-    hourlyRate: 160000,
-    rating: 4.7,
-    reviewsCount: 31,
-    jobsDone: 240,
-    verified: true,
-    bio: 'Từng chăm sóc người cao tuổi có bệnh nền, biết đo huyết áp và nhắc thuốc đúng cữ.',
-  },
-  {
-    id: 'thu',
-    name: 'Hoàng Thị Thu',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
-    role: 'Giúp việc giặt ủi',
-    experienceYears: 2,
-    area: 'Đà Nẵng',
-    district: 'Hải Châu',
-    skills: ['Giặt ủi', 'Dọn dẹp'],
-    hourlyRate: 110000,
-    rating: 4.8,
-    reviewsCount: 27,
-    jobsDone: 96,
-    verified: true,
-    bio: 'Là ủi cẩn thận, xử lý vết bẩn cứng đầu và sắp xếp tủ quần áo ngăn nắp.',
-  },
-  {
-    id: 'kien',
-    name: 'Đặng Văn Kiên',
-    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
-    role: 'Nhân viên tổng vệ sinh',
-    experienceYears: 3,
-    area: 'TP. Hồ Chí Minh',
-    district: 'Tân Bình',
-    skills: ['Tổng vệ sinh', 'Dọn dẹp'],
-    hourlyRate: 130000,
-    rating: 4.7,
-    reviewsCount: 22,
-    jobsDone: 88,
-    verified: true,
-    bio: 'Chuyên vệ sinh nhà mới sửa, lau kính cao tầng, vệ sinh máy lạnh và sàn gỗ.',
-  },
-  {
-    id: 'tuan',
-    name: 'Vũ Minh Tuấn',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
-    role: 'Nhân viên tổng vệ sinh',
-    experienceYears: 4,
-    area: 'Hà Nội',
-    district: 'Hoàng Mai',
-    skills: ['Tổng vệ sinh', 'Giặt ủi'],
-    hourlyRate: 135000,
-    rating: 4.6,
-    reviewsCount: 19,
-    jobsDone: 112,
-    verified: true,
-    bio: 'Đội trưởng nhóm vệ sinh 3 người, phụ trách dọn nhà đón lễ Tết và văn phòng nhỏ.',
-  },
-  {
-    id: 'hanh',
-    name: 'Ngô Thị Hạnh',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=600&q=80',
-    role: 'Người chăm sóc trẻ',
-    experienceYears: 5,
-    area: 'Đà Nẵng',
-    district: 'Thanh Khê',
-    skills: ['Chăm sóc trẻ', 'Chăm sóc người già'],
-    hourlyRate: 155000,
-    rating: 4.9,
-    reviewsCount: 47,
-    jobsDone: 168,
-    verified: true,
-    bio: 'Có chứng chỉ sơ cấp dưỡng, đưa đón bé đi học và rèn thói quen tự lập cho bé.',
-  },
-  {
-    id: 'quoc-anh',
-    name: 'Bùi Quốc Anh',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80',
-    role: 'Người nấu ăn',
-    experienceYears: 2,
-    area: 'TP. Hồ Chí Minh',
-    district: 'Quận 3',
-    skills: ['Nấu ăn', 'Tổng vệ sinh'],
-    hourlyRate: 125000,
-    rating: 4.5,
-    reviewsCount: 15,
-    jobsDone: 74,
-    verified: true,
-    bio: 'Nấu tiệc gia đình 6 - 10 người, đi chợ theo thực đơn và dọn bếp sau khi nấu.',
-  },
-  {
-    id: 'ngoc',
-    name: 'Nguyễn Thị Ngọc',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=600&q=80',
-    role: 'Chăm sóc người cao tuổi',
-    experienceYears: 7,
-    area: 'Hà Nội',
-    district: 'Tây Hồ',
-    skills: ['Chăm sóc người già', 'Nấu ăn'],
-    hourlyRate: 170000,
-    rating: 4.9,
-    reviewsCount: 63,
-    jobsDone: 310,
-    verified: true,
-    bio: '7 năm chăm sóc người già, biết xoa bóp, hỗ trợ phục hồi chức năng và dinh dưỡng.',
-  },
-];
 
 /* Kỹ năng (dropdown) — id trùng với giá trị trong helper.skills để lọc trực tiếp */
 const SKILL_OPTIONS = [
@@ -241,11 +75,22 @@ const PAGE_SIZE = 9;
 
 const HelpersPage = () => {
   const navigate = useNavigate();
+  const [helpersList, setHelpersList] = useState([]);
+  const [servicesList, setServicesList] = useState([]);
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [favorites, setFavorites] = useState({});
   const [page, setPage] = useState(1);
   const listTopRef = useRef(null);
+
+  useEffect(() => {
+    Promise.all([workerApi.getWorkers(), serviceApi.getServices()])
+      .then(([workers, services]) => {
+        setHelpersList(workers);
+        setServicesList(services);
+      })
+      .catch((err) => console.error('Lỗi tải dữ liệu người giúp việc từ MongoDB:', err));
+  }, []);
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -278,13 +123,13 @@ const HelpersPage = () => {
     const salaryFilter = SALARY_OPTIONS.find((opt) => opt.id === filters.salary) || SALARY_OPTIONS[0];
     const ratingFilter = RATING_OPTIONS.find((opt) => opt.id === filters.rating) || RATING_OPTIONS[0];
 
-    const result = helpersList.filter((helper) => {
+    const result = (helpersList || []).filter((helper) => {
       // 1. Từ khóa: tên, chức danh, kỹ năng, mô tả
-      const haystack = [helper.name, helper.role, helper.bio, ...helper.skills].join(' ').toLowerCase();
+      const haystack = [helper.name, helper.role, helper.bio, ...(helper.skills || [])].join(' ').toLowerCase();
       if (keyword && !haystack.includes(keyword)) return false;
 
       // 2. Kỹ năng
-      if (filters.skill !== 'all' && !helper.skills.includes(filters.skill)) return false;
+      if (filters.skill !== 'all' && !(helper.skills || []).includes(filters.skill)) return false;
 
       // 3. Khu vực
       if (filters.area !== 'all' && helper.area !== filters.area) return false;
@@ -309,10 +154,10 @@ const HelpersPage = () => {
         sorted.sort((a, b) => b.hourlyRate - a.hourlyRate);
         break;
       case 'experience':
-        sorted.sort((a, b) => b.experienceYears - a.experienceYears);
+        sorted.sort((a, b) => (b.experienceYears || 0) - (a.experienceYears || 0));
         break;
       case 'jobs':
-        sorted.sort((a, b) => b.jobsDone - a.jobsDone);
+        sorted.sort((a, b) => (b.jobsDone || 0) - (a.jobsDone || 0));
         break;
       case 'rating':
       default:
@@ -320,7 +165,7 @@ const HelpersPage = () => {
         break;
     }
     return sorted;
-  }, [filters]);
+  }, [filters, helpersList]);
 
   /* Phân trang: 9 người giúp việc / trang */
   const totalPages = Math.max(1, Math.ceil(filteredHelpers.length / PAGE_SIZE));
@@ -339,10 +184,10 @@ const HelpersPage = () => {
   };
 
   const handleBookHelper = (helper) => {
-    const srv = resolveService({ service: helper.skills[0] || 'Dọn dẹp nhà theo giờ' });
+    const srv = resolveService({ service: helper.skills?.[0] || 'Dọn dẹp nhà theo giờ' }, servicesList);
     const params = new URLSearchParams();
     params.set('helper', helper.name);
-    navigate(`/services/${srv?.id || 'SVC-001'}/book?${params.toString()}`);
+    navigate(`/services/${srv?.serviceCode || srv?.id || 'CLEANING_HOURLY'}/book?${params.toString()}`);
   };
 
   return (

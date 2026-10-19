@@ -18,15 +18,15 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import {
-  mockServices,
-  getServiceById,
-  mockWorkers,
   buildDefaultDynamicAttributes,
   computePricing,
   formatVND,
   summarizeDynamicAttributes,
-  PRICING_TYPES
-} from '../mock/servicesData';
+  PRICING_TYPES,
+  resolveService,
+} from '../utils/serviceUtils';
+import serviceApi from '../api/serviceApi';
+import workerApi from '../api/workerApi';
 
 const BookingPage = () => {
   const { id } = useParams();
@@ -34,9 +34,17 @@ const BookingPage = () => {
   const { user, addBooking } = useAuth();
   const navigate = useNavigate();
 
-  // Xác định dịch vụ hiện tại dựa trên id từ URL param
-  const activeService = useMemo(() => {
-    return getServiceById(id) || mockServices[0];
+  const [workers, setWorkers] = useState([]);
+  const [activeService, setActiveService] = useState(null);
+
+  useEffect(() => {
+    Promise.all([serviceApi.getServices(), workerApi.getWorkers()])
+      .then(([servicesData, workersData]) => {
+        setWorkers(workersData);
+        const found = resolveService({ serviceId: id }, servicesData);
+        setActiveService(found || servicesData[0] || null);
+      })
+      .catch((err) => console.error('Lỗi khi tải dữ liệu từ MongoDB:', err));
   }, [id]);
 
   const initialHelperParam = searchParams.get('helper') || searchParams.get('helperName');
@@ -77,11 +85,13 @@ const BookingPage = () => {
     // Người thực hiện
     if (initialHelperParam && initialHelperParam !== 'Người giúp việc phù hợp nhất') {
       setWorkerOption('SPECIFIC');
-      const matched = mockWorkers.find((w) => 
-        w.name.toLowerCase() === initialHelperParam.toLowerCase() ||
-        w.id.toLowerCase() === initialHelperParam.toLowerCase()
+      const matched = (workers || []).find((w) => 
+        w.name?.toLowerCase() === initialHelperParam.toLowerCase() ||
+        (w.code && w.code.toLowerCase() === initialHelperParam.toLowerCase()) ||
+        w.id === initialHelperParam ||
+        w._id === initialHelperParam
       );
-      setSelectedWorkerId(matched?.id || mockWorkers[0]?.id || '');
+      setSelectedWorkerId(matched?.id || matched?._id || matched?.code || workers[0]?.id || workers[0]?._id || '');
     } else {
       setWorkerOption('AUTO');
       setSelectedWorkerId('');
@@ -90,7 +100,7 @@ const BookingPage = () => {
     if (initialAddressParam) {
       setFullAddress(initialAddressParam);
     }
-  }, [activeService, initialHelperParam, initialAddressParam]);
+  }, [activeService, initialHelperParam, initialAddressParam, workers]);
 
   // Tính toán chi phí real-time
   const calculationSummary = useMemo(() => {
@@ -101,7 +111,7 @@ const BookingPage = () => {
   }, [activeService, durationHours, dynamicAttributes]);
 
   // Lấy tên người thực hiện hiển thị
-  const chosenWorker = mockWorkers.find((w) => w.id === selectedWorkerId);
+  const chosenWorker = (workers || []).find((w) => w.id === selectedWorkerId || w._id === selectedWorkerId || w.code === selectedWorkerId);
   const helperDisplayName =
     workerOption === 'SPECIFIC' && chosenWorker
       ? chosenWorker.name
@@ -127,7 +137,7 @@ const BookingPage = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) {
       alert('Vui lòng đăng nhập tài khoản Khách hàng để đặt dịch vụ!');
@@ -138,15 +148,20 @@ const BookingPage = () => {
     const summaryText = summarizeDynamicAttributes(activeService, dynamicAttributes);
 
     const bookingPayload = {
+      // Customer info
+      customerName: user?.name || 'Khách hàng',
+      customerEmail: user?.email || '',
+      customerPhone: user?.phone || '',
+
       // 1. serviceId & serviceTitle
-      serviceId: activeService?.id,
+      serviceId: activeService?.id || activeService?._id,
       serviceCode: activeService?.serviceCode,
       serviceTitle: activeService?.title,
-      service: activeService?.title, // giữ tương thích hiển thị cũ
+      service: activeService?.title,
 
       // 2. workerOption
       workerOption: workerOption === 'AUTO' ? 'Người giúp việc phù hợp nhất' : 'Chọn nhân viên cụ thể',
-      workerId: workerOption === 'SPECIFIC' ? chosenWorker?.id : null,
+      workerId: workerOption === 'SPECIFIC' ? chosenWorker?.id || chosenWorker?._id : null,
       helper: helperDisplayName,
 
       // 3. durationHours
@@ -166,7 +181,7 @@ const BookingPage = () => {
 
       // 7. customerNotes
       customerNotes,
-      note: customerNotes,
+      notes: customerNotes,
 
       // 8. dynamicAttributes
       dynamicAttributes,
@@ -179,9 +194,10 @@ const BookingPage = () => {
         totalPrice: calculationSummary.totalPrice,
       },
       price: `${calculationSummary.totalPrice.toLocaleString('vi-VN')}đ`,
+      totalPrice: calculationSummary.totalPrice,
     };
 
-    const newBooking = addBooking(bookingPayload);
+    const newBooking = await addBooking(bookingPayload);
     setCreatedBooking(newBooking);
     setIsSuccess(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -330,8 +346,8 @@ const BookingPage = () => {
                   type="button"
                   onClick={() => {
                     setWorkerOption('SPECIFIC');
-                    if (!selectedWorkerId && mockWorkers.length > 0) {
-                      setSelectedWorkerId(mockWorkers[0].id);
+                    if (!selectedWorkerId && workers.length > 0) {
+                      setSelectedWorkerId(workers[0].id || workers[0]._id);
                     }
                   }}
                   className={`p-2.5 rounded-xl border text-left transition-all ${
@@ -353,12 +369,13 @@ const BookingPage = () => {
               {/* Danh sách nhân viên để chọn nếu chọn SPECIFIC */}
               {workerOption === 'SPECIFIC' && (
                 <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {mockWorkers.map((w) => {
-                    const isSelected = selectedWorkerId === w.id;
+                  {workers.map((w) => {
+                    const workerId = w.id || w._id;
+                    const isSelected = selectedWorkerId === workerId;
                     return (
                       <div
-                        key={w.id}
-                        onClick={() => setSelectedWorkerId(w.id)}
+                        key={workerId}
+                        onClick={() => setSelectedWorkerId(workerId)}
                         className={`flex items-center gap-2.5 p-2 rounded-xl border cursor-pointer transition-all ${
                           isSelected
                             ? 'bg-blue-50/80 border-blue-500 text-slate-900 shadow-xs'

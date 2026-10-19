@@ -14,20 +14,20 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(true);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!fullName || !email) {
-      alert('Vui lòng nhập họ tên và email để đăng ký test!');
+      alert('Vui lòng nhập họ tên và email để đăng ký!');
       return;
     }
-    const newUser = register({
+    const newUser = await register({
       role,
       fullName,
       email,
       phone,
       password,
     });
-    navigate(newUser.redirectPath);
+    navigate(newUser.redirectPath || '/');
   };
 
   const roles = [

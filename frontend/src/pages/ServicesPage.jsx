@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import BenefitsBanner from '../components/BenefitsBanner';
@@ -24,10 +24,11 @@ import {
   SearchX,
 } from 'lucide-react';
 import {
-  mockServices,
   PRICING_TYPES,
   SERVICE_CATEGORIES,
-} from '../mock/servicesData';
+  SERVICE_AREAS,
+} from '../utils/serviceUtils';
+import serviceApi from '../api/serviceApi';
 import '../styles/Home.css';
 
 /* Map iconKey trong mock data -> icon component của lucide */
@@ -44,45 +45,14 @@ const ICON_MAP = {
   ShieldCheck,
 };
 
-/*
- * Danh sách dịch vụ lấy từ mock data dùng chung (frontend/src/mock/servicesData.js).
- * Khi backend có endpoint GET /api/services, chỉ cần thay nguồn `mockServices` bằng call API.
- * Các trường dưới đây là "view model" phục vụ bộ lọc & card hiển thị.
- */
-const servicesList = mockServices.map((service) => ({
-  id: service.id,
-  serviceId: service.id,
-  serviceCode: service.serviceCode,
-  title: service.title,
-  subtitle: service.subtitle,
-  desc: service.shortDescription,
-  description: service.description,
-  price: service.pricing.formattedPrice,
-  priceFrom: service.pricing.priceFrom,
-  priceTo: service.pricing.priceTo,
-  sortPrice: service.pricing.sortPrice,
-  pricing: service.pricing,
-  category: service.category,
-  areas: service.areas,
-  rating: service.rating,
-  reviews: service.reviewCount,
-  bookings: service.bookingCount,
-  image: service.imageUrl,
-  icon: ICON_MAP[service.iconKey] || Sparkles,
-  bgCircle: service.themeClass,
-  tags: service.tags,
-  isPackage: service.isPackage,
-  isHourly: service.pricing.type === PRICING_TYPES.HOURLY,
-  raw: service,
-}));
-/* Bộ lọc danh mục (dropdown) - lấy từ danh mục của mock data */
+/* Bộ lọc danh mục (dropdown) */
 const CATEGORY_OPTIONS = [
   { id: 'all', label: 'Tất cả danh mục' },
   ...SERVICE_CATEGORIES.map((category) => ({ id: category, label: category })),
 ];
 
-/* Khu vực đang có người giúp việc (dropdown) - suy ra từ dữ liệu dịch vụ */
-const AREA_OPTIONS = [...new Set(servicesList.flatMap((srv) => srv.areas))];
+/* Khu vực đang có người giúp việc (dropdown) */
+const AREA_OPTIONS = SERVICE_AREAS;
 
 /* Bộ lọc mức giá: theo đơn giá/giờ quy đổi của từng dịch vụ */
 const PRICE_OPTIONS = [
@@ -125,10 +95,46 @@ const PAGE_SIZE = 9;
 
 const ServicesPage = () => {
   const navigate = useNavigate();
+  const [rawServices, setRawServices] = useState([]);
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
   const listTopRef = useRef(null);
+
+  useEffect(() => {
+    serviceApi.getServices()
+      .then((data) => setRawServices(data))
+      .catch((err) => console.error('Lỗi khi tải dịch vụ từ MongoDB:', err));
+  }, []);
+
+  const servicesList = useMemo(() => {
+    return (rawServices || []).map((service) => ({
+      id: service._id || service.id || service.serviceCode,
+      serviceId: service.serviceCode || service.id || service._id,
+      serviceCode: service.serviceCode,
+      title: service.title,
+      subtitle: service.subtitle,
+      desc: service.shortDescription,
+      description: service.description,
+      price: service.pricing?.formattedPrice,
+      priceFrom: service.pricing?.priceFrom,
+      priceTo: service.pricing?.priceTo,
+      sortPrice: service.pricing?.sortPrice,
+      pricing: service.pricing,
+      category: service.category,
+      areas: service.areas || [],
+      rating: service.rating,
+      reviews: service.reviewCount,
+      bookings: service.bookingCount,
+      image: service.imageUrl,
+      icon: ICON_MAP[service.iconKey] || Sparkles,
+      bgCircle: service.themeClass,
+      tags: service.tags || [],
+      isPackage: service.isPackage,
+      isHourly: service.pricing?.type === PRICING_TYPES.HOURLY,
+      raw: service,
+    }));
+  }, [rawServices]);
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -157,7 +163,7 @@ const ServicesPage = () => {
     const priceFilter = PRICE_OPTIONS.find((opt) => opt.id === filters.price) || PRICE_OPTIONS[0];
     const ratingFilter = RATING_OPTIONS.find((opt) => opt.id === filters.rating) || RATING_OPTIONS[0];
 
-    const result = servicesList.filter((srv) => {
+    const result = (servicesList || []).filter((srv) => {
       // 1. Từ khóa: tên, mô tả, kỹ năng
       const haystack = [srv.title, srv.subtitle, srv.desc, ...srv.tags].join(' ').toLowerCase();
       if (keyword && !haystack.includes(keyword)) return false;
@@ -203,7 +209,7 @@ const ServicesPage = () => {
         break;
     }
     return sorted;
-  }, [filters]);
+  }, [filters, servicesList]);
 
   /* Phân trang: 9 dịch vụ / trang */
   const totalPages = Math.max(1, Math.ceil(filteredServices.length / PAGE_SIZE));

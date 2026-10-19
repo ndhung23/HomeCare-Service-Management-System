@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import HeroSection from '../components/HeroSection';
@@ -6,15 +6,23 @@ import ServicesSection from '../components/ServicesSection';
 import FeaturedHelpersSection from '../components/FeaturedHelpersSection';
 import BenefitsBanner from '../components/BenefitsBanner';
 import Footer from '../components/Footer';
-import { resolveService } from '../mock/servicesData';
+import serviceApi from '../api/serviceApi';
+import { resolveService } from '../utils/serviceUtils';
 import '../styles/Home.css';
 
 const Home = () => {
   const navigate = useNavigate();
+  const [services, setServices] = useState([]);
+
+  useEffect(() => {
+    serviceApi.getServices()
+      .then((data) => setServices(data))
+      .catch((err) => console.warn('Không thể tải dịch vụ:', err));
+  }, []);
 
   const handleOpenBooking = (data = {}) => {
-    const srv = resolveService(data);
-    const serviceId = srv?.id || 'SVC-001';
+    const srv = resolveService(data, services);
+    const serviceId = srv?.serviceCode || srv?.id || 'CLEANING_HOURLY';
     
     const params = new URLSearchParams();
     if (data.helperName) params.set('helper', data.helperName);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import BenefitsBanner from '../components/BenefitsBanner';
 import Footer from '../components/Footer';
@@ -8,59 +8,20 @@ import {
   ThumbsUp, 
   ShieldCheck
 } from 'lucide-react';
+import reviewApi from '../api/reviewApi';
 import '../styles/Home.css';
 
-const mockReviews = [
-  {
-    id: 1,
-    author: 'Chị Mai Phương',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
-    date: 'Hôm qua',
-    service: 'Dọn dẹp nhà theo giờ',
-    helper: 'Cô Nguyễn Thị Lan',
-    rating: 5,
-    comment: 'Cô Lan làm việc cực kỳ cẩn thận và sạch sẽ. Đồ đạc trong phòng khách và bếp được xếp lại ngăn nắp, thơm mát. Chắc chắn sẽ tiếp tục đặt cô vào tuần tới!',
-    likes: 12,
-  },
-  {
-    id: 2,
-    author: 'Anh Tuấn Hưng',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    date: '3 ngày trước',
-    service: 'Nấu ăn gia đình',
-    helper: 'Chị Lê Thị Mai',
-    rating: 5,
-    comment: 'Gia đình mình có con nhỏ và ông bà lớn tuổi, chị Mai nấu ăn rất vừa miệng, các món canh thanh đạm, ít dầu mỡ, cả nhà ai cũng khen ngon.',
-    likes: 8,
-  },
-  {
-    id: 3,
-    author: 'Chị Ngọc Hà',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
-    date: '1 tuần trước',
-    service: 'Chăm sóc trẻ em',
-    helper: 'Cô Trần Thị Hương',
-    rating: 5,
-    comment: 'Bé nhà mình khá nhát người lạ nhưng cô Hương rất khéo dỗ dành và kiên nhẫn. Mình đi làm cả ngày hoàn toàn yên tâm khi có cô chăm sóc bé.',
-    likes: 15,
-  },
-  {
-    id: 4,
-    author: 'Anh Quốc Bảo',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-    date: '2 tuần trước',
-    service: 'Giặt ủi & Là quần áo',
-    helper: 'Cô Phạm Thị Dung',
-    rating: 4.8,
-    comment: 'Áo sơ mi của mình được là phẳng phiu cẩn thận, quần áo gấp gọn gàng chia theo từng ngăn tủ. Tác phong làm việc đúng giờ và lễ phép.',
-    likes: 6,
-  },
-];
-
 const ReviewsPage = () => {
+  const [reviews, setReviews] = useState([]);
   const [filterRating, setFilterRating] = useState('all');
 
-  const filtered = mockReviews.filter(r => {
+  useEffect(() => {
+    reviewApi.getReviews()
+      .then((data) => setReviews(data))
+      .catch((err) => console.error('Lỗi khi tải đánh giá từ MongoDB:', err));
+  }, []);
+
+  const filtered = reviews.filter((r) => {
     if (filterRating === 'all') return true;
     return r.rating >= parseFloat(filterRating);
   });
