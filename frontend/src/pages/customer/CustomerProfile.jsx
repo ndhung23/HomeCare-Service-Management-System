@@ -25,6 +25,7 @@ const CustomerProfile = () => {
   const [bookings, setBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'profile'
 
   // Modals
   const [paymentModalData, setPaymentModalData] = useState(null);
@@ -106,8 +107,8 @@ const CustomerProfile = () => {
   };
 
   const customerNav = [
-    { label: 'Lịch sử đặt dịch vụ', path: '/customer', icon: Calendar, badge: `${bookings.length}` },
-    { label: 'Hồ sơ tài khoản', path: '/customer', icon: User },
+    { key: 'bookings', label: 'Lịch sử đặt dịch vụ', active: activeTab === 'bookings', onClick: () => setActiveTab('bookings'), icon: Calendar, badge: bookings.length > 0 ? `${bookings.length}` : null },
+    { key: 'profile', label: 'Hồ sơ tài khoản', active: activeTab === 'profile', onClick: () => setActiveTab('profile'), icon: User },
   ];
 
   const filteredBookings = bookings.filter((b) => {
@@ -125,6 +126,8 @@ const CustomerProfile = () => {
       roleBadge="Khách hàng (/customer)"
       roleColor="blue"
       sidebarNav={customerNav}
+      activeTab={activeTab}
+      onTabChange={(tabKey) => setActiveTab(tabKey)}
       pageTitle="Trang cá nhân Khách hàng"
       pageSubtitle="Theo dõi tiến độ ca giúp việc và lịch sử đặt dịch vụ"
     >
@@ -161,7 +164,8 @@ const CustomerProfile = () => {
       </div>
 
       {/* Bookings Container */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 sm:p-8 space-y-6">
+      {activeTab === 'bookings' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 sm:p-8 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
           <div>
             <h3 className="text-base font-extrabold text-slate-900">Danh sách đơn dịch vụ</h3>
@@ -311,7 +315,53 @@ const CustomerProfile = () => {
             })}
           </div>
         )}
-      </div>
+        </div>
+      )}
+
+      {/* Account Profile Tab */}
+      {activeTab === 'profile' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 sm:p-8 space-y-6">
+          <div className="border-b pb-4">
+            <h3 className="text-base font-extrabold text-slate-900">Thông tin tài khoản</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Quản lý hồ sơ cá nhân và thông tin liên hệ của bạn</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-600">Họ và tên</label>
+              <div className="p-3 bg-slate-50 border rounded-xl font-semibold text-slate-900">{user?.name}</div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-600">Địa chỉ Email</label>
+              <div className="p-3 bg-slate-50 border rounded-xl font-semibold text-slate-900">{user?.email}</div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-600">Số điện thoại</label>
+              <div className="p-3 bg-slate-50 border rounded-xl font-semibold text-slate-900">{user?.phone || 'Chưa cập nhật'}</div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-600">Vai trò tài khoản</label>
+              <div className="p-3 bg-slate-50 border rounded-xl font-semibold text-blue-700">{user?.roleName || 'Khách hàng'}</div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-600">Trạng thái xác thực</label>
+              <div className="p-3 bg-slate-50 border rounded-xl font-semibold text-emerald-600 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Hoạt động (Active)</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-600">Đơn hàng đã đặt</label>
+              <div className="p-3 bg-slate-50 border rounded-xl font-semibold text-slate-900">{bookings.length} đơn dịch vụ</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* VietQR Payment Modal */}
       {paymentModalData && (

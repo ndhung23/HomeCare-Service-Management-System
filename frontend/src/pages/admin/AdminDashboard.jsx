@@ -166,10 +166,10 @@ const AdminDashboard = () => {
   };
 
   const adminNav = [
-    { label: 'Xác nhận thanh toán', path: '#', onClick: () => setActiveTab('PAYMENT'), icon: DollarSign, badge: `${awaitingBookings.length}` },
-    { label: 'Duyệt CCCD (KYC)', path: '#', onClick: () => setActiveTab('KYC'), icon: ShieldCheck, badge: `${pendingKycList.length}` },
-    { label: 'Duyệt lệnh rút tiền', path: '#', onClick: () => setActiveTab('WITHDRAW'), icon: CreditCard, badge: `${withdraws.length}` },
-    { label: 'Quản lý người dùng', path: '#', onClick: () => setActiveTab('USERS'), icon: Users },
+    { key: 'PAYMENT', label: 'Xác nhận thanh toán', active: activeTab === 'PAYMENT', onClick: () => setActiveTab('PAYMENT'), icon: DollarSign, badge: awaitingBookings.length > 0 ? `${awaitingBookings.length}` : null },
+    { key: 'KYC', label: 'Duyệt CCCD (KYC)', active: activeTab === 'KYC', onClick: () => setActiveTab('KYC'), icon: ShieldCheck, badge: pendingKycList.length > 0 ? `${pendingKycList.length}` : null },
+    { key: 'WITHDRAW', label: 'Duyệt lệnh rút tiền', active: activeTab === 'WITHDRAW', onClick: () => setActiveTab('WITHDRAW'), icon: CreditCard, badge: withdraws.length > 0 ? `${withdraws.length}` : null },
+    { key: 'USERS', label: 'Quản lý người dùng', active: activeTab === 'USERS', onClick: () => setActiveTab('USERS'), icon: Users, badge: users.length > 0 ? `${users.length}` : null },
   ];
 
   return (
@@ -177,6 +177,8 @@ const AdminDashboard = () => {
       roleBadge="Admin (/admin)"
       roleColor="indigo"
       sidebarNav={adminNav}
+      activeTab={activeTab}
+      onTabChange={(tabKey) => setActiveTab(tabKey)}
       pageTitle="Bảng điều khiển Quản trị viên"
       pageSubtitle="Giám sát vận hành, đối soát thanh toán và phê duyệt danh tính"
     >

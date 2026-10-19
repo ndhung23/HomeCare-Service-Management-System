@@ -76,10 +76,10 @@ const EnterpriseDashboard = () => {
   }, [fetchData]);
 
   const enterpriseNav = [
-    { label: 'Bàn làm việc Doanh nghiệp', path: '/enterprise', icon: Building2 },
-    { label: 'Đội ngũ Nhân sự B2B', path: '/enterprise', icon: Users, badge: `${employees.length}` },
-    { label: 'Lịch ca & Hợp đồng', path: '/enterprise', icon: CalendarCheck, badge: companyBookings.length > 0 ? `${companyBookings.length}` : null },
-    { label: 'Ví & Doanh thu Sàn', path: '/enterprise', icon: DollarSign },
+    { key: 'MARKET', label: 'Chợ nhận việc B2B', active: activeTab === 'MARKET', onClick: () => setActiveTab('MARKET'), icon: Building2, badge: openBookings.length > 0 ? `${openBookings.length}` : null },
+    { key: 'SCHEDULE', label: 'Lịch ca & Hợp đồng', active: activeTab === 'SCHEDULE', onClick: () => setActiveTab('SCHEDULE'), icon: CalendarCheck, badge: companyBookings.length > 0 ? `${companyBookings.length}` : null },
+    { key: 'EMPLOYEES', label: 'Đội ngũ Nhân sự B2B', active: activeTab === 'EMPLOYEES', onClick: () => setActiveTab('EMPLOYEES'), icon: Users, badge: employees.length > 0 ? `${employees.length}` : null },
+    { key: 'WALLET', label: 'Ví & Doanh thu Sàn', active: activeTab === 'WALLET', onClick: () => setActiveTab('WALLET'), icon: DollarSign },
   ];
 
   const availableBalance = walletData?.wallet?.available ?? (currentUser?.wallet?.available || 0);
@@ -89,6 +89,8 @@ const EnterpriseDashboard = () => {
       roleBadge="Doanh nghiệp B2B (/enterprise)"
       roleColor="amber"
       sidebarNav={enterpriseNav}
+      activeTab={activeTab}
+      onTabChange={(tabKey) => setActiveTab(tabKey)}
       pageTitle="Quản trị Đối tác Doanh nghiệp"
       pageSubtitle="Nhận ca từ sàn, phân công nhân sự và quyết toán doanh thu chiết khấu 12%"
     >

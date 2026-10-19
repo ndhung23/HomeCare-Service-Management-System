@@ -35,10 +35,10 @@ const HelperProfile = () => {
   }, [fetchMyBookings]);
 
   const helperNav = [
-    { label: 'Chợ việc làm mới', path: '#', onClick: () => setActiveTab('market'), icon: Briefcase },
-    { label: 'Lịch ca đã nhận', path: '#', onClick: () => setActiveTab('my-jobs'), icon: Calendar, badge: `${myBookings.length}` },
-    { label: 'Ví & Thu nhập', path: '#', onClick: () => setActiveTab('wallet'), icon: CreditCard },
-    { label: 'Xác minh CCCD (KYC)', path: '#', onClick: () => setActiveTab('kyc'), icon: ShieldCheck, badge: user?.kycLevel === 2 ? 'Cấp 2' : 'Cấp 1' },
+    { key: 'market', label: 'Chợ việc làm mới', active: activeTab === 'market', onClick: () => setActiveTab('market'), icon: Briefcase },
+    { key: 'my-jobs', label: 'Lịch ca đã nhận', active: activeTab === 'my-jobs', onClick: () => setActiveTab('my-jobs'), icon: Calendar, badge: myBookings.length > 0 ? `${myBookings.length}` : null },
+    { key: 'wallet', label: 'Ví & Thu nhập', active: activeTab === 'wallet', onClick: () => setActiveTab('wallet'), icon: CreditCard },
+    { key: 'kyc', label: 'Xác minh CCCD (KYC)', active: activeTab === 'kyc', onClick: () => setActiveTab('kyc'), icon: ShieldCheck, badge: user?.kycLevel === 2 ? 'Cấp 2' : 'Cấp 1' },
   ];
 
   const isLevel2 = (user?.kycLevel || 1) >= 2;
@@ -48,6 +48,8 @@ const HelperProfile = () => {
       roleBadge="Người giúp việc (/helper)"
       roleColor="blue"
       sidebarNav={helperNav}
+      activeTab={activeTab}
+      onTabChange={(tabKey) => setActiveTab(tabKey)}
       pageTitle="Trang quản lý Cộng tác viên"
       pageSubtitle="Nhận việc linh hoạt, thực hiện ca và quản lý ví thu nhập"
     >

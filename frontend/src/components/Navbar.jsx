@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, LogOut, LayoutDashboard, User, Settings, ChevronDown, RotateCw, Bell, CheckCheck } from 'lucide-react';
+import { Search, LogOut, LayoutDashboard, User, Settings, ChevronDown, Bell, CheckCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import notificationApi from '../api/notificationApi';
 
@@ -248,16 +248,6 @@ const Navbar = () => {
                       >
                         <Settings className="w-4 h-4 text-slate-400" />
                         <span>Cài đặt</span>
-                      </button>
-
-                      {/* Đổi role test */}
-                      <button
-                        type="button"
-                        onClick={() => navigate('/login')}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl text-amber-600 hover:bg-amber-50 transition-colors text-left"
-                      >
-                        <RotateCw className="w-4 h-4 text-amber-500" />
-                        <span>Đổi role khác test</span>
                       </button>
                     </div>
 

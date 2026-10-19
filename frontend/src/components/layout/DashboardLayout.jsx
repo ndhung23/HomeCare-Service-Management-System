@@ -4,7 +4,6 @@ import { useAuth } from '../../context/AuthContext';
 import { 
   LogOut, 
   Home, 
-  RotateCw,
   Bell,
   Search,
   User,
@@ -18,11 +17,15 @@ const DashboardLayout = ({
   sidebarNav = [], 
   children,
   pageTitle,
-  pageSubtitle
+  pageSubtitle,
+  activeTab: controlledActiveTab,
+  onTabChange,
 }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(0);
+  const [internalActiveTab, setInternalActiveTab] = useState(0);
+
+  const currentTab = controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab;
 
   const handleLogout = () => {
     logout();
@@ -107,13 +110,28 @@ const DashboardLayout = ({
             </div>
             {sidebarNav.map((item, idx) => {
               const Icon = item.icon;
-              const isActive = activeTab === idx;
+              const isActive = item.active !== undefined
+                ? Boolean(item.active)
+                : (typeof currentTab === 'number' ? currentTab === idx : currentTab === item.key);
+
+              const handleItemClick = () => {
+                setInternalActiveTab(idx);
+                if (typeof onTabChange === 'function') {
+                  onTabChange(item.key !== undefined ? item.key : idx);
+                }
+                if (typeof item.onClick === 'function') {
+                  item.onClick();
+                } else if (item.path && item.path !== '#') {
+                  navigate(item.path);
+                }
+              };
+
               return (
                 <button
-                  key={idx}
+                  key={item.key || idx}
                   type="button"
-                  onClick={() => setActiveTab(idx)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition-all ${
+                  onClick={handleItemClick}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition-all cursor-pointer ${
                     isActive
                       ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium'
@@ -140,15 +158,6 @@ const DashboardLayout = ({
 
         {/* Bottom actions in Sidebar */}
         <div className="p-3 border-t border-slate-800/80 space-y-1">
-          {/* Quick Role Switcher Button for Testing */}
-          <button
-            onClick={() => navigate('/login')}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-amber-300 hover:bg-amber-500/10 transition-colors"
-          >
-            <RotateCw className="w-4 h-4 text-amber-400" />
-            <span>Đổi role khác test</span>
-          </button>
-
           {/* Back to Home Button */}
           <Link
             to="/"
@@ -273,16 +282,6 @@ const DashboardLayout = ({
                     >
                       <Settings className="w-4 h-4 text-slate-400" />
                       <span>Cài đặt</span>
-                    </button>
-
-                    {/* Quick switch test role */}
-                    <button
-                      type="button"
-                      onClick={() => navigate('/login')}
-                      className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl text-amber-600 hover:bg-amber-50 transition-colors text-left"
-                    >
-                      <RotateCw className="w-4 h-4 text-amber-500" />
-                      <span>Đổi role khác test</span>
                     </button>
                   </div>
 
