@@ -28,6 +28,24 @@ const generateToken = (userId) => {
   });
 };
 
+const sanitizeUser = (u) => ({
+  id: u._id,
+  name: u.name,
+  email: u.email,
+  role: u.role,
+  roleName: u.roleName || getRoleName(u.role),
+  phone: u.phone,
+  avatar: u.avatar,
+  status: u.status || 'ACTIVE',
+  kycLevel: u.kycLevel || 1,
+  kyc: u.kyc,
+  bank: u.bank,
+  wallet: u.wallet,
+  employees: u.employees || [],
+  redirectPath: u.redirectPath || (u.role === 'customer' ? '/' : getRoleDashboardPath(u.role)),
+  dashboardPath: u.dashboardPath || getRoleDashboardPath(u.role),
+});
+
 export const register = async (req, res) => {
   try {
     const { name, fullName, email, password, confirmPassword, phone, role } = req.body;
@@ -61,24 +79,6 @@ export const register = async (req, res) => {
       dashboardPath: getRoleDashboardPath(userRole),
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
     });
-
-const sanitizeUser = (u) => ({
-  id: u._id,
-  name: u.name,
-  email: u.email,
-  role: u.role,
-  roleName: u.roleName || getRoleName(u.role),
-  phone: u.phone,
-  avatar: u.avatar,
-  status: u.status || 'ACTIVE',
-  kycLevel: u.kycLevel || 1,
-  kyc: u.kyc,
-  bank: u.bank,
-  wallet: u.wallet,
-  employees: u.employees || [],
-  redirectPath: u.redirectPath || (u.role === 'customer' ? '/' : getRoleDashboardPath(u.role)),
-  dashboardPath: u.dashboardPath || getRoleDashboardPath(u.role),
-});
 
     const token = generateToken(user._id);
 
