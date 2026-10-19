@@ -13,6 +13,13 @@ export const adminApi = {
   getWithdraws: (params) => axiosClient.get('/admin/withdraws', { params }).then((res) => res.data),
   approveWithdraw: (withdrawId) => axiosClient.put(`/admin/withdraws/${withdrawId}/approve`).then((res) => res.data),
   rejectWithdraw: (withdrawId, reason) => axiosClient.put(`/admin/withdraws/${withdrawId}/reject`, { reason }).then((res) => res.data),
+  getConfig: () => axiosClient.get('/admin/config').then((res) => res.data),
+  updateConfig: (data) => axiosClient.put('/admin/config', data).then((res) => res.data),
+  getContent: (params) => axiosClient.get('/admin/content', { params }).then((res) => res.data),
+  saveContent: (data, id) => (id ? axiosClient.put(`/admin/content/${id}`, data) : axiosClient.post('/admin/content', data)).then((res) => res.data),
+  deleteContent: (id) => axiosClient.delete(`/admin/content/${id}`).then((res) => res.data),
+  removeViolation: (userId, violationId, adminNote) => axiosClient.delete(`/admin/users/${userId}/violations/${violationId}`, { data: { adminNote } }).then((res) => res.data),
+  toggleReviewVisibility: (reviewId, reason) => axiosClient.put(`/reviews/${reviewId}/visibility`, { reason }).then((res) => res.data),
 };
 
 export default adminApi;

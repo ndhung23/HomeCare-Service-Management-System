@@ -2,6 +2,8 @@ import User from '../models/User.js';
 import Booking from '../models/Booking.js';
 import Worker from '../models/Worker.js';
 import Notification from '../models/Notification.js';
+import SystemConfig from '../models/SystemConfig.js';
+import ContentItem from '../models/ContentItem.js';
 
 // Danh sách hồ sơ KYC đang chờ duyệt
 export const getPendingKycList = async (req, res) => {
@@ -208,6 +210,146 @@ export const getAdminStats = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Lỗi tải thống kê', error: error.message });
+  }
+};
+
+// Cấu hình hệ thống động (Role.md Mục 14)
+export const getSystemConfig = async (req, res) => {
+  try {
+    let config = await SystemConfig.findOne({ key: 'PRIMARY_CONFIG' });
+    if (!config) {
+      config = await SystemConfig.create({ key: 'PRIMARY_CONFIG' });
+    }
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi tải cấu hình hệ thống', error: error.message });
+  }
+};
+
+export const updateSystemConfig = async (req, res) => {
+  try {
+    const {
+      baseHourlyRates,
+      serviceStatus,
+      holidays,
+      holidayMultiplier,
+      helperCommissionRate,
+      enterpriseCommissionRate,
+    } = req.body;
+
+    let config = await SystemConfig.findOne({ key: 'PRIMARY_CONFIG' });
+    if (!config) {
+      config = new SystemConfig({ key: 'PRIMARY_CONFIG' });
+    }
+
+    if (baseHourlyRates) config.baseHourlyRates = { ...config.baseHourlyRates, ...baseHourlyRates };
+    if (serviceStatus) config.serviceStatus = { ...config.serviceStatus, ...serviceStatus };
+    if (holidays) config.holidays = holidays;
+    if (holidayMultiplier !== undefined) config.holidayMultiplier = Number(holidayMultiplier);
+    if (helperCommissionRate !== undefined) config.helperCommissionRate = Number(helperCommissionRate);
+    if (enterpriseCommissionRate !== undefined) config.enterpriseCommissionRate = Number(enterpriseCommissionRate);
+    config.updatedBy = req.user._id;
+
+    await config.save();
+    res.json({ success: true, message: 'Đã lưu cấu hình hệ thống thành công!', config });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi cập nhật cấu hình', error: error.message });
+  }
+};
+
+// Quản lý Content Items (FAQ / Tin tức / Chính sách - Role.md 2.1.h)
+export const getContentItems = async (req, res) => {
+  try {
+    const { type } = req.query;
+    let query = {};
+    if (type) query.type = type;
+
+    const items = await ContentItem.find(query).sort({ order: 1, createdAt: -1 });
+    res.json(items);
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi tải danh sách nội dung', error: error.message });
+  }
+};
+
+export const createOrUpdateContentItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, title, category, content, summary, imageUrl, order, isPublished } = req.body;
+
+    if (id) {
+      const updated = await ContentItem.findByIdAndUpdate(
+        id,
+        { type, title, category, content, summary, imageUrl, order, isPublished, authorId: req.user._id },
+        { new: true }
+      );
+      return res.json({ success: true, message: 'Đã cập nhật nội dung thành công!', item: updated });
+    }
+
+    const created = await ContentItem.create({
+      type: type || 'FAQ',
+      title,
+      category: category || 'Chung',
+      content,
+      summary: summary || '',
+      imageUrl: imageUrl || '',
+      order: Number(order) || 0,
+      isPublished: isPublished !== false,
+      authorId: req.user._id,
+    });
+
+    res.status(201).json({ success: true, message: 'Đã tạo nội dung mới thành công!', item: created });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi lưu nội dung', error: error.message });
+  }
+};
+
+export const deleteContentItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await ContentItem.findByIdAndDelete(id);
+    res.json({ success: true, message: 'Đã xóa nội dung thành công!' });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi khi xóa nội dung', error: error.message });
+  }
+};
+
+// Xóa vi phạm oan cho người dùng (Role.md 8.6 & Mục 15.2)
+export const removeUserViolation = async (req, res) => {
+  try {
+    const { userId, violationId } = req.params;
+    const { adminNote = '' } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+
+    const violation = (user.violations || []).id(violationId);
+    if (!violation) {
+      return res.status(404).json({ message: 'Không tìm thấy bản ghi vi phạm' });
+    }
+
+    violation.removedByAdmin = true;
+    violation.adminNote = adminNote || 'Admin đã gỡ vi phạm này';
+
+    // Đếm lại vi phạm hợp lệ còn lại trong 90 ngày
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const activeViolations = (user.violations || []).filter(
+      (v) => !v.removedByAdmin && new Date(v.createdAt) >= ninetyDaysAgo
+    );
+
+    if (activeViolations.length < 2) {
+      user.jobClaimLockedUntil = null;
+    }
+    if (activeViolations.length < 3 && user.lockReason?.includes('vi phạm')) {
+      user.status = 'ACTIVE';
+      user.lockReason = '';
+    }
+
+    await user.save();
+    res.json({ success: true, message: 'Đã gỡ bỏ vi phạm thành công cho người dùng', user });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi gỡ vi phạm', error: error.message });
   }
 };
 

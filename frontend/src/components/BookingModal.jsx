@@ -56,7 +56,7 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
   };
 
   // Các state form cơ bản
-  const [workerOption, setWorkerOption] = useState('AUTO'); // 'AUTO' | 'SPECIFIC'
+  const [workerOption, setWorkerOption] = useState('MARKET'); // 'MARKET' | 'AUTO' | 'SPECIFIC'
   const [selectedWorkerId, setSelectedWorkerId] = useState('');
   const [durationHours, setDurationHours] = useState(3);
   const [workDate, setWorkDate] = useState(getTomorrow());
@@ -87,12 +87,16 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
     setDurationHours(initialH);
 
     // Người thực hiện
-    if (initialData.helperName && initialData.helperName !== 'Người giúp việc phù hợp nhất') {
+    if (initialData.workerId || (initialData.helperName && initialData.helperName !== 'Người giúp việc phù hợp nhất')) {
       setWorkerOption('SPECIFIC');
-      const matched = (workers || []).find((w) => w.name === initialData.helperName || w.id === initialData.helperName || w._id === initialData.helperName);
+      const targetId = initialData.workerId;
+      const matched = (workers || []).find((w) => 
+        (targetId && (w.id === targetId || w._id === targetId || w.userId === targetId)) ||
+        w.name === initialData.helperName
+      );
       setSelectedWorkerId(matched?.id || matched?._id || workers[0]?.id || workers[0]?._id || '');
     } else {
-      setWorkerOption('AUTO');
+      setWorkerOption('MARKET');
       setSelectedWorkerId('');
     }
 
@@ -116,9 +120,11 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
   const helperDisplayName =
     workerOption === 'SPECIFIC' && chosenWorker
       ? chosenWorker.name
+      : workerOption === 'AUTO'
+      ? 'Hệ thống tự động ghép'
       : initialData.helperName && initialData.helperName !== 'Người giúp việc phù hợp nhất'
       ? initialData.helperName
-      : 'Người giúp việc phù hợp nhất';
+      : 'Chợ việc làm (Chờ nhận)';
 
   // Handler cập nhật dynamic attributes
   const handleDynamicChange = (key, value) => {
@@ -160,8 +166,14 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
       serviceTitle: activeService?.title,
       service: activeService?.title,
 
-      // 2. workerOption
-      workerOption: workerOption === 'AUTO' ? 'Người giúp việc phù hợp nhất' : 'Chọn nhân viên cụ thể',
+      // 2. workerOption & dispatchMode
+      dispatchMode: workerOption,
+      workerOption:
+        workerOption === 'MARKET'
+          ? 'Đăng lên Chợ việc làm'
+          : workerOption === 'AUTO'
+          ? 'Người giúp việc phù hợp nhất'
+          : 'Chọn nhân viên cụ thể',
       workerId: workerOption === 'SPECIFIC' ? chosenWorker?.id || chosenWorker?._id : null,
       helper: helperDisplayName,
 
@@ -334,13 +346,34 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
               </div>
             </div>
 
-            {/* Chọn hình thức người giúp việc: AUTO hoặc CHỌN CỤ THỂ */}
+            {/* Chọn hình thức người giúp việc: MARKET, AUTO hoặc CHỌN CỤ THỂ */}
             <div>
               <label className="text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-blue-600" />
-                <span>Hình thức phân công</span>
+                <span>Hình thức phân công (Điều phối)</span>
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkerOption('MARKET');
+                    setSelectedWorkerId('');
+                  }}
+                  className={`p-2.5 rounded-xl border text-left transition-all ${
+                    workerOption === 'MARKET'
+                      ? 'bg-blue-50/70 border-blue-500 text-blue-900 shadow-xs'
+                      : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <div className="text-xs font-bold flex items-center gap-1.5">
+                    {workerOption === 'MARKET' && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                    <span>Chợ việc làm</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    Công khai trên Chợ, người nhận sớm sẽ làm
+                  </div>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -355,10 +388,10 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
                 >
                   <div className="text-xs font-bold flex items-center gap-1.5">
                     {workerOption === 'AUTO' && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
-                    <span>Phù hợp nhất (AUTO)</span>
+                    <span>Ghép nhanh (AUTO)</span>
                   </div>
                   <div className="text-[10px] text-slate-500 mt-0.5">
-                    Hệ thống tự động tìm người gần nhất, nhận ca nhanh
+                    Ưu tiên 5 phút cho CTV Cấp 2 điểm cao
                   </div>
                 </button>
 
@@ -378,10 +411,10 @@ const BookingModal = ({ isOpen, onClose, initialData = {} }) => {
                 >
                   <div className="text-xs font-bold flex items-center gap-1.5">
                     {workerOption === 'SPECIFIC' && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
-                    <span>Chọn nhân viên cụ thể</span>
+                    <span>Chỉ định cụ thể</span>
                   </div>
                   <div className="text-[10px] text-slate-500 mt-0.5">
-                    Chủ động lựa chọn nhân viên ưng ý theo hồ sơ
+                    Gửi lời mời trực tiếp đến người bạn chọn
                   </div>
                 </button>
               </div>

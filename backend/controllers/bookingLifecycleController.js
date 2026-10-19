@@ -1,4 +1,5 @@
 import Booking from '../models/Booking.js';
+import User from '../models/User.js';
 import Notification from '../models/Notification.js';
 import { assertTransition } from '../services/bookingStateMachine.js';
 import { getFileUrl } from '../middleware/uploadMiddleware.js';
@@ -43,6 +44,15 @@ export const acceptBooking = async (req, res) => {
     if (user.role !== 'admin' && (user.kycLevel || 1) < 2) {
       return res.status(403).json({
         message: 'Tài khoản Cấp 1 cần chờ Admin xác thực hồ sơ CCCD để bắt đầu nhận việc',
+      });
+    }
+
+    // Kiểm tra khóa nhận ca do vi phạm (Role.md Mục 8.6)
+    const dbUser = await User.findById(user._id);
+    if (dbUser && dbUser.jobClaimLockedUntil && new Date(dbUser.jobClaimLockedUntil) > new Date()) {
+      const unlockDate = new Date(dbUser.jobClaimLockedUntil).toLocaleString('vi-VN');
+      return res.status(403).json({
+        message: `Tài khoản của bạn đang bị tạm khóa nhận ca đến ngày ${unlockDate} do ghi nhận vi phạm!`,
       });
     }
 
@@ -232,6 +242,35 @@ export const completeBooking = async (req, res) => {
       booking.evidence = [...(booking.evidence || []), ...evidenceUrls];
     }
 
+    // Role.md 5.1.e & 10.4: Quyết toán tiền đi chợ hộ thực tế (COOKING)
+    if (booking.pricingSnapshot?.advanceFee > 0) {
+      const budgetMax = booking.pricingSnapshot.advanceFee;
+      const actualGrocery = req.body.actualGroceryFee !== undefined
+        ? Number(req.body.actualGroceryFee)
+        : budgetMax;
+
+      if (actualGrocery < 0 || actualGrocery > budgetMax) {
+        return res.status(400).json({
+          message: `Tiền đi chợ thực tế không được âm và không được vượt quá hạn mức ngân sách khách cấp (${budgetMax.toLocaleString('vi-VN')}đ)!`,
+        });
+      }
+
+      booking.actualGroceryFee = actualGrocery;
+      if (req.body.groceryReceiptUrls) {
+        booking.groceryReceiptUrls = Array.isArray(req.body.groceryReceiptUrls)
+          ? req.body.groceryReceiptUrls
+          : [req.body.groceryReceiptUrls];
+      }
+
+      const laborTotal = booking.pricingSnapshot.laborTotal || 0;
+      const platformFee = booking.pricingSnapshot.platformFee || 0;
+      booking.totalPrice = laborTotal + actualGrocery;
+      booking.price = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(booking.totalPrice);
+      booking.helperEarnings = (laborTotal - platformFee) + actualGrocery;
+      booking.pricingSnapshot.advanceFee = actualGrocery;
+      booking.pricingSnapshot.helperEarnings = booking.helperEarnings;
+    }
+
     const saved = await booking.save();
 
     if (booking.customerId) {
@@ -350,4 +389,293 @@ export const cancelBooking = async (req, res) => {
     res.status(500).json({ message: 'Lỗi khi xử lý hủy đơn', error: error.message });
   }
 };
+
+// Phản hồi yêu cầu hủy đơn 2 chiều (Role.md 8.5)
+export const respondCancelRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, note = '' } = req.body; // 'accept' hoặc 'reject'
+    const user = req.user;
+    const booking = await Booking.findById(id);
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn dịch vụ' });
+    }
+
+    if (!booking.cancelRequest || !booking.cancelRequest.requestedBy) {
+      return res.status(400).json({ message: 'Đơn này hiện không có yêu cầu hủy nào đang chờ phản hồi' });
+    }
+
+    if (booking.cancelRequest.requestedRole === user.role && user.role !== 'admin') {
+      return res.status(400).json({ message: 'Bạn không thể tự xác nhận yêu cầu do chính mình tạo' });
+    }
+
+    if (action === 'accept') {
+      booking.status = 'CANCELLED';
+      booking.statusColor = 'rose';
+      booking.cancelRequest.status = 'APPROVED';
+      booking.cancelRequest.respondedAt = new Date();
+      booking.cancelRequest.responseNote = note;
+      const saved = await booking.save();
+
+      const notifyTarget = user.role === 'customer' ? booking.assigneeId : booking.customerId;
+      if (notifyTarget) {
+        await Notification.create({
+          userId: notifyTarget,
+          title: 'Yêu cầu hủy đơn đã được chấp thuận',
+          message: `${user.name} đã đồng ý hủy đơn #${booking.bookingCode}. Đơn đã được hủy thành công (miễn phí).`,
+          type: 'INFO',
+          link: user.role === 'customer' ? '/helper' : '/customer',
+        }).catch(() => {});
+      }
+
+      return res.json({ success: true, message: 'Đã chấp thuận hủy đơn dịch vụ', booking: saved });
+    } else {
+      booking.cancelRequest.status = 'REJECTED';
+      booking.cancelRequest.respondedAt = new Date();
+      booking.cancelRequest.responseNote = note;
+      booking.cancelRequest.requestedBy = ''; // Reset yêu cầu
+      const saved = await booking.save();
+
+      const notifyTarget = user.role === 'customer' ? booking.assigneeId : booking.customerId;
+      if (notifyTarget) {
+        await Notification.create({
+          userId: notifyTarget,
+          title: 'Yêu cầu hủy đơn bị từ chối',
+          message: `${user.name} đã từ chối yêu cầu hủy ca #${booking.bookingCode}. Ca làm việc vẫn diễn ra theo lịch.`,
+          type: 'WARNING',
+          link: user.role === 'customer' ? '/helper' : '/customer',
+        }).catch(() => {});
+      }
+
+      return res.json({ success: true, message: 'Đã từ chối yêu cầu hủy đơn. Ca vẫn tiếp tục.', booking: saved });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi khi phản hồi yêu cầu hủy', error: error.message });
+  }
+};
+
+// Báo cáo No-Show & Vắng mặt (Role.md 8.6)
+export const reportNoshow = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = '', evidenceUrls = [] } = req.body;
+    const user = req.user;
+    const booking = await Booking.findById(id);
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn dịch vụ' });
+    }
+
+    // Trường hợp 1: Khách báo Helper bỏ ca (No-show > 30 phút sau startAt)
+    if (user.role === 'customer' || (booking.customerId && booking.customerId.toString() === user._id.toString())) {
+      if (!booking.startAt) {
+        return res.status(400).json({ message: 'Đơn không có thời gian bắt đầu hợp lệ' });
+      }
+
+      const overdueMs = Date.now() - new Date(booking.startAt).getTime();
+      const thirtyMinsMs = 30 * 60 * 1000;
+      if (overdueMs < thirtyMinsMs && user.role !== 'admin') {
+        return res.status(400).json({
+          message: 'Chỉ có thể báo vắng mặt khi đã quá 30 phút sau giờ hẹn mà người giúp việc chưa đến!',
+        });
+      }
+
+      if (booking.assigneeId) {
+        const workerUser = await User.findById(booking.assigneeId);
+        if (workerUser) {
+          if (!workerUser.violations) workerUser.violations = [];
+          workerUser.violations.push({
+            reason: `Vắng mặt / Bỏ ca không đến (No-show ca #${booking.bookingCode})`,
+            bookingId: booking._id,
+            bookingCode: booking.bookingCode,
+            createdAt: new Date(),
+            removedByAdmin: false,
+          });
+
+          // Đếm số lần vi phạm trong 90 ngày
+          const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+          const activeViolations = workerUser.violations.filter(
+            (v) => !v.removedByAdmin && new Date(v.createdAt) >= ninetyDaysAgo
+          );
+
+          if (activeViolations.length === 1) {
+            await Notification.create({
+              userId: workerUser._id,
+              title: 'Cảnh báo vi phạm bỏ ca (Lần 1)',
+              message: `Bạn bị ghi nhận vắng mặt tại ca #${booking.bookingCode}. Tái phạm lần 2 sẽ bị khóa nhận việc 3 ngày.`,
+              type: 'WARNING',
+            });
+          } else if (activeViolations.length === 2) {
+            workerUser.jobClaimLockedUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+            await Notification.create({
+              userId: workerUser._id,
+              title: 'Tạm khóa nhận ca 3 ngày (Vi phạm lần 2)',
+              message: `Bạn bị ghi nhận bỏ ca lần 2. Tài khoản tạm dừng nhận việc trong 3 ngày.`,
+              type: 'WARNING',
+            });
+          } else if (activeViolations.length >= 3) {
+            workerUser.status = 'LOCKED';
+            workerUser.lockReason = 'Hệ thống tự động khóa do vi phạm bỏ ca 3 lần trong vòng 90 ngày';
+            await Notification.create({
+              userId: workerUser._id,
+              title: 'Khóa tài khoản do vi phạm lần 3',
+              message: 'Tài khoản của bạn đã bị khóa do đạt 3 lần vi phạm bỏ ca. Vui lòng liên hệ Admin.',
+              type: 'DANGER',
+            });
+          }
+          await workerUser.save();
+        }
+      }
+
+      // Đẩy ca quay lại PENDING để người khác nhận (Role.md 8.6)
+      booking.status = 'PENDING';
+      booking.statusColor = 'amber';
+      booking.assigneeId = null;
+      booking.acceptedBy = '';
+      booking.acceptedAt = null;
+      booking.helper = 'Người giúp việc phù hợp nhất';
+      booking.helperPhone = '';
+      booking.assignedEmployee = { id: '', name: '', phone: '', avatar: '' };
+      booking.noshowReport = {
+        reportedBy: user.name,
+        role: 'customer',
+        reason: reason || 'Khách báo người làm vắng mặt quá 30 phút',
+        reportedAt: new Date(),
+        evidenceUrls,
+      };
+      const saved = await booking.save();
+
+      return res.json({
+        success: true,
+        message: 'Đã ghi nhận báo cáo vắng mặt. Ca đã được tự động đẩy lại Chợ việc làm để tìm người thay thế.',
+        booking: saved,
+      });
+    }
+
+    // Trường hợp 2: Helper/Enterprise báo "Khách không có mặt"
+    booking.noshowReport = {
+      reportedBy: user.name,
+      role: user.role,
+      reason: reason || 'Người làm báo khách hàng không có mặt tại địa chỉ',
+      reportedAt: new Date(),
+      evidenceUrls,
+    };
+    const saved = await booking.save();
+
+    return res.json({
+      success: true,
+      message: 'Đã gửi báo cáo Khách không có mặt kèm bằng chứng. Admin sẽ kiểm tra và hỗ trợ bạn.',
+      booking: saved,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi khi báo cáo vắng mặt', error: error.message });
+  }
+};
+
+// Doanh nghiệp đổi nhân viên phụ trách ca UPCOMING (Role.md 8.3 & Flow 5)
+export const reassignEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { employeeId } = req.body;
+    const user = req.user;
+
+    if (user.role !== 'enterprise' && user.role !== 'admin') {
+      return res.status(403).json({ message: 'Chỉ Doanh nghiệp mới có quyền đổi nhân viên phụ trách' });
+    }
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn dịch vụ' });
+    }
+
+    if (booking.status !== 'UPCOMING') {
+      return res.status(400).json({ message: 'Chỉ có thể đổi nhân viên khi ca ở trạng thái Sắp diễn ra' });
+    }
+
+    const employee = (user.employees || []).find((e) => e.id === employeeId);
+    if (!employee) {
+      return res.status(400).json({ message: 'Nhân viên mới không tồn tại trong danh sách công ty' });
+    }
+
+    const conflict = await checkScheduleConflict(user._id, employee.id, booking.startAt, booking.endAt, booking._id);
+    if (conflict) {
+      return res.status(400).json({
+        message: `Nhân viên ${employee.name} đã có ca làm việc khác trong khung giờ này (yêu cầu giãn cách 30 phút)!`,
+      });
+    }
+
+    booking.assignedEmployee = {
+      id: employee.id,
+      name: employee.name,
+      phone: employee.phone || user.phone || '',
+      avatar: employee.avatar || '',
+    };
+    booking.helper = `${user.name} (NV: ${employee.name})`;
+    booking.helperPhone = employee.phone || user.phone || '';
+    const saved = await booking.save();
+
+    if (booking.customerId) {
+      await Notification.create({
+        userId: booking.customerId,
+        title: 'Thay đổi nhân viên phụ trách ca',
+        message: `Doanh nghiệp đã đổi nhân viên phụ trách ca #${booking.bookingCode} thành ${employee.name} (SĐT: ${employee.phone || user.phone}).`,
+        type: 'INFO',
+        link: '/customer',
+      }).catch(() => {});
+    }
+
+    res.json({ success: true, message: 'Đã đổi nhân viên phụ trách thành công', booking: saved });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi khi đổi nhân viên', error: error.message });
+  }
+};
+
+// Phản hồi lời mời nhận ca AUTO / SPECIFIC (Role.md 8.2 & 8.3)
+export const respondInvite = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, employeeId } = req.body; // 'accept' hoặc 'reject'
+    const user = req.user;
+    const booking = await Booking.findById(id);
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn dịch vụ' });
+    }
+
+    if (booking.status !== 'PENDING') {
+      return res.status(400).json({ message: 'Đơn này không còn ở trạng thái chờ nhận' });
+    }
+
+    if (action === 'accept') {
+      // Chuyển hướng sang acceptBooking logic
+      req.params.id = id;
+      if (employeeId) req.body.employeeId = employeeId;
+      return acceptBooking(req, res);
+    } else {
+      booking.inviteStatus = 'REJECTED';
+      // Nếu là AUTO -> tự động mở lên Chợ việc làm (Role.md Flow 2)
+      if (booking.dispatchMode === 'AUTO') {
+        booking.invitedWorkerId = null;
+        booking.dispatchMode = 'MARKET';
+      }
+      const saved = await booking.save();
+
+      if (booking.customerId) {
+        await Notification.create({
+          userId: booking.customerId,
+          title: 'Người làm đã từ chối lời mời',
+          message: `${user.name} không thể nhận đơn #${booking.bookingCode}. Đơn đã được chuyển lên Chợ việc làm.`,
+          type: 'INFO',
+          link: '/customer',
+        }).catch(() => {});
+      }
+
+      return res.json({ success: true, message: 'Đã từ chối lời mời nhận ca', booking: saved });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi khi phản hồi lời mời', error: error.message });
+  }
+};
+
 

@@ -51,6 +51,15 @@ const reviewSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    isHidden: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    hiddenReason: {
+      type: String,
+      default: '',
+    },
   },
   { timestamps: true }
 );

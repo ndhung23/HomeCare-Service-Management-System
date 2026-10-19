@@ -182,11 +182,58 @@ const bookingSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
+    dispatchMode: {
+      type: String,
+      enum: ['MARKET', 'AUTO', 'SPECIFIC'],
+      default: 'MARKET',
+    },
+    invitedWorkerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
+    inviteExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    inviteStatus: {
+      type: String,
+      enum: ['NONE', 'PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED'],
+      default: 'NONE',
+    },
+    actualGroceryFee: {
+      type: Number,
+      default: 0,
+    },
+    groceryReceiptUrls: {
+      type: [String],
+      default: [],
+    },
+    noshowReport: {
+      reportedBy: { type: String, default: '' },
+      role: { type: String, default: '' },
+      reason: { type: String, default: '' },
+      reportedAt: { type: Date, default: null },
+      evidenceUrls: { type: [String], default: [] },
+    },
+    disputeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Dispute',
+      default: null,
+    },
     cancelRequest: {
+      status: {
+        type: String,
+        enum: ['NONE', 'PENDING', 'APPROVED', 'REJECTED', 'ADMIN_RESOLVED'],
+        default: 'NONE',
+      },
       requestedBy: { type: String, default: '' },
       requestedRole: { type: String, default: '' },
       reason: { type: String, default: '' },
       requestedAt: { type: Date, default: null },
+      respondedAt: { type: Date, default: null },
+      responseNote: { type: String, default: '' },
     },
     isReviewed: {
       type: Boolean,

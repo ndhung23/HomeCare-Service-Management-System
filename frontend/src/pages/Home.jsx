@@ -5,6 +5,7 @@ import HeroSection from '../components/HeroSection';
 import ServicesSection from '../components/ServicesSection';
 import FeaturedHelpersSection from '../components/FeaturedHelpersSection';
 import BenefitsBanner from '../components/BenefitsBanner';
+import FaqSection from '../components/FaqSection';
 import Footer from '../components/Footer';
 import serviceApi from '../api/serviceApi';
 import { resolveService } from '../utils/serviceUtils';
@@ -39,6 +40,7 @@ const Home = () => {
         <HeroSection onOpenBooking={handleOpenBooking} />
         <ServicesSection onOpenBooking={handleOpenBooking} />
         <FeaturedHelpersSection onOpenBooking={handleOpenBooking} />
+        <FaqSection />
         <BenefitsBanner />
       </main>
 

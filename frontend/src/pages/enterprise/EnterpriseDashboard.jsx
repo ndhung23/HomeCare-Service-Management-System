@@ -5,8 +5,7 @@ import {
   Users, 
   CalendarCheck, 
   DollarSign, 
-  Clock, 
-  Briefcase
+  Clock 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import bookingApi from '../../api/bookingApi';
@@ -166,45 +165,7 @@ const EnterpriseDashboard = () => {
         </div>
       </div>
 
-      {/* Main Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 mb-6 pb-2 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('MARKET')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-            activeTab === 'MARKET' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Briefcase className="w-4 h-4" />
-          <span>Chợ việc làm B2B ({openBookings.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('SCHEDULE')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-            activeTab === 'SCHEDULE' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <CalendarCheck className="w-4 h-4" />
-          <span>Lịch ca & Hợp đồng ({companyBookings.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('EMPLOYEES')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-            activeTab === 'EMPLOYEES' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Đội ngũ Nhân sự ({employees.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('WALLET')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-            activeTab === 'WALLET' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <DollarSign className="w-4 h-4" />
-          <span>Ví & Doanh thu B2B</span>
-        </button>
-      </div>
+
 
       {/* Tab Panels */}
       {activeTab === 'MARKET' && (
@@ -225,6 +186,7 @@ const EnterpriseDashboard = () => {
         <ScheduleTab
           companyBookings={companyBookings}
           isLoading={isLoading}
+          employees={employees}
           onRefresh={fetchData}
         />
       )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Sparkles, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import bookingApi from '../../../api/bookingApi';
+import authApi from '../../../api/authApi';
 import { formatVND } from '../../../utils/serviceUtils';
 
 const MarketTab = ({ user, onJobAccepted, onNavigateToKyc }) => {
@@ -8,6 +9,7 @@ const MarketTab = ({ user, onJobAccepted, onNavigateToKyc }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [isAvailable, setIsAvailable] = useState(user?.isAvailableForJobs !== false);
 
   const fetchMarket = async () => {
     setIsLoading(true);
@@ -25,7 +27,19 @@ const MarketTab = ({ user, onJobAccepted, onNavigateToKyc }) => {
 
   useEffect(() => {
     fetchMarket();
-  }, []);
+    setIsAvailable(user?.isAvailableForJobs !== false);
+  }, [user]);
+
+  const handleToggleAvailability = async (e) => {
+    const val = e.target.checked;
+    setIsAvailable(val);
+    try {
+      await authApi.updateAvailability({ isAvailableForJobs: val });
+    } catch (err) {
+      console.error(err);
+      setIsAvailable(!val);
+    }
+  };
 
   const isLevel2 = (user?.kycLevel || 1) >= 2;
 
@@ -44,6 +58,21 @@ const MarketTab = ({ user, onJobAccepted, onNavigateToKyc }) => {
     } catch (err) {
       const msg = err.response?.data?.message || 'Có lỗi xảy ra khi nhận việc!';
       alert(msg);
+      await fetchMarket();
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRespondInvite = async (bookingId, action) => {
+    setActionLoadingId(bookingId);
+    try {
+      await bookingApi.respondInvite(bookingId, { action });
+      alert(action === 'accept' ? 'Đã nhận ca thành công!' : 'Đã từ chối lời mời.');
+      await fetchMarket();
+      if (action === 'accept' && onJobAccepted) onJobAccepted();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Có lỗi xảy ra khi phản hồi lời mời!');
       await fetchMarket();
     } finally {
       setActionLoadingId(null);
@@ -71,7 +100,7 @@ const MarketTab = ({ user, onJobAccepted, onNavigateToKyc }) => {
       )}
 
       {/* Header filter bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
             <span>Chợ việc làm mới</span>
@@ -83,14 +112,27 @@ const MarketTab = ({ user, onJobAccepted, onNavigateToKyc }) => {
             Các ca khách hàng vừa đặt và đang chờ người giúp việc phù hợp nhận việc
           </p>
         </div>
-        <button
-          onClick={fetchMarket}
-          disabled={isLoading}
-          className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 text-xs font-bold flex items-center gap-1.5"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>Làm mới</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            <input
+              type="checkbox"
+              checked={isAvailable}
+              onChange={handleToggleAvailability}
+              className="rounded text-emerald-600 focus:ring-emerald-500"
+            />
+            <span className={isAvailable ? 'text-emerald-700' : 'text-slate-400'}>
+              {isAvailable ? '● Sẵn sàng nhận việc' : '○ Tạm nghỉ nhận ca'}
+            </span>
+          </label>
+          <button
+            onClick={fetchMarket}
+            disabled={isLoading}
+            className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 text-xs font-bold flex items-center gap-1.5"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Làm mới</span>
+          </button>
+        </div>
       </div>
 
       {errorMsg && (
@@ -110,12 +152,27 @@ const MarketTab = ({ user, onJobAccepted, onNavigateToKyc }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {openBookings.map((job) => {
             const earnings = job.helperEarnings || Math.round((job.totalPrice || 0) * 0.8);
+            const isInvited = Boolean(job.isInvitedToMe);
+
             return (
               <div
                 key={job._id || job.id}
-                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:border-blue-400 transition-all flex flex-col justify-between"
+                className={`bg-white rounded-2xl border p-5 shadow-xs transition-all flex flex-col justify-between ${
+                  isInvited ? 'border-purple-400 ring-2 ring-purple-100' : 'border-slate-200 hover:border-blue-400'
+                }`}
               >
                 <div>
+                  {isInvited && (
+                    <div className="mb-3 p-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold flex items-center justify-between shadow-xs">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" /> Lời mời dành riêng cho bạn
+                      </span>
+                      <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full uppercase">
+                        {job.dispatchMode || 'Ưu tiên'}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
                       <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
@@ -150,18 +207,38 @@ const MarketTab = ({ user, onJobAccepted, onNavigateToKyc }) => {
                   <div className="text-[11px] text-slate-400">
                     Tổng giá đơn: {job.price || formatVND(job.totalPrice)}
                   </div>
-                  <button
-                    onClick={() => handleAccept(job._id || job.id)}
-                    disabled={!isLevel2 || actionLoadingId === (job._id || job.id)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs ${
-                      !isLevel2
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    }`}
-                  >
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>{actionLoadingId === (job._id || job.id) ? 'Đang nhận...' : 'Nhận việc ngay'}</span>
-                  </button>
+                  {isInvited ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleRespondInvite(job._id || job.id, 'reject')}
+                        disabled={actionLoadingId === (job._id || job.id)}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold"
+                      >
+                        Từ chối
+                      </button>
+                      <button
+                        onClick={() => handleRespondInvite(job._id || job.id, 'accept')}
+                        disabled={!isLevel2 || actionLoadingId === (job._id || job.id)}
+                        className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Nhận ca
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleAccept(job._id || job.id)}
+                      disabled={!isLevel2 || actionLoadingId === (job._id || job.id)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs ${
+                        !isLevel2
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>{actionLoadingId === (job._id || job.id) ? 'Đang nhận...' : 'Nhận việc ngay'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             );

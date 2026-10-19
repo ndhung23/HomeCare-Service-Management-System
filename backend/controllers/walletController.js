@@ -2,6 +2,7 @@ import User from '../models/User.js';
 import WalletTransaction from '../models/WalletTransaction.js';
 import WithdrawRequest from '../models/WithdrawRequest.js';
 import Notification from '../models/Notification.js';
+import Dispute from '../models/Dispute.js';
 
 // Xem số dư ví và lịch sử giao dịch cá nhân
 export const getMyWallet = async (req, res) => {
@@ -45,7 +46,7 @@ export const updateBankInfo = async (req, res) => {
   }
 };
 
-// Tạo yêu cầu rút tiền về ngân hàng (Role.md 9.4)
+// Tạo yêu cầu rút tiền về ngân hàng (Role.md 9.4 & 14)
 export const requestWithdraw = async (req, res) => {
   try {
     const { amount, bankName, accountNumber, accountName } = req.body;
@@ -59,6 +60,19 @@ export const requestWithdraw = async (req, res) => {
 
     if ((user.kycLevel || 1) < 2) {
       return res.status(403).json({ message: 'Chỉ tài khoản Cấp 2 đã xác minh mới được phép rút tiền' });
+    }
+
+    // Kiểm tra giới hạn tối đa 3 lệnh rút / ngày (Role.md Mục 14)
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const todayCount = await WithdrawRequest.countDocuments({
+      userId: user._id,
+      createdAt: { $gte: startOfDay },
+    });
+    if (todayCount >= 3) {
+      return res.status(400).json({
+        message: 'Bạn đã đạt giới hạn tối đa 3 lệnh rút tiền trong ngày theo quy định sàn!',
+      });
     }
 
     if ((user.wallet?.available || 0) < withdrawAmount) {
@@ -77,6 +91,25 @@ export const requestWithdraw = async (req, res) => {
       return res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ thông tin tài khoản ngân hàng nhận tiền' });
     }
 
+    // Kiểm tra các cờ bất thường (Role.md Flow 6 & Mục 14)
+    let isFlagged = false;
+    const flagReasons = [];
+
+    if (withdrawAmount > 5000000) {
+      isFlagged = true;
+      flagReasons.push('Số tiền rút lớn (> 5.000.000đ)');
+    }
+
+    // Kiểm tra tài khoản có khiếu nại đang mở
+    const activeDispute = await Dispute.findOne({
+      $or: [{ creatorId: user._id }, { respondentId: user._id }],
+      status: { $in: ['OPEN', 'IN_REVIEW'] },
+    });
+    if (activeDispute) {
+      isFlagged = true;
+      flagReasons.push('Tài khoản đang có khiếu nại chưa xử lý xong');
+    }
+
     // Trừ số dư khả dụng
     user.wallet.available -= withdrawAmount;
     await user.save();
@@ -86,6 +119,8 @@ export const requestWithdraw = async (req, res) => {
       amount: withdrawAmount,
       bank,
       status: 'PENDING',
+      isFlagged,
+      flagReason: flagReasons.join(' | '),
     });
 
     await WalletTransaction.create({
@@ -93,12 +128,14 @@ export const requestWithdraw = async (req, res) => {
       type: 'WITHDRAW',
       amount: -withdrawAmount,
       balanceAfter: user.wallet.available,
-      note: `Yêu cầu rút ${withdrawAmount.toLocaleString('vi-VN')}đ về ${bank.bankName} (${bank.accountNumber})`,
+      note: `Yêu cầu rút ${withdrawAmount.toLocaleString('vi-VN')}đ về ${bank.bankName} (${bank.accountNumber})${isFlagged ? ' [Cần Admin kiểm tra]' : ''}`,
     });
 
     res.json({
       success: true,
-      message: 'Yêu cầu rút tiền đã được tạo thành công và đang chờ Admin xử lý!',
+      message: isFlagged
+        ? 'Yêu cầu rút tiền đã được tạo. Do số tiền lớn hoặc tài khoản cần kiểm tra, Admin sẽ phê duyệt trong 24 giờ.'
+        : 'Yêu cầu rút tiền đã được tạo thành công và đang chờ Admin xử lý!',
       withdraw,
       balance: user.wallet.available,
     });

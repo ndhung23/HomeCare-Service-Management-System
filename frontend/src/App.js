@@ -9,6 +9,7 @@ import ReviewsPage from './pages/ReviewsPage';
 import NewsPage from './pages/NewsPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ResetPassword from './pages/ResetPassword';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import EnterpriseDashboard from './pages/enterprise/EnterpriseDashboard';
 import HelperProfile from './pages/helper/HelperProfile';
@@ -41,6 +42,7 @@ function App() {
           {/* Auth Routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
           
           {/* Role specific routes */}
           <Route

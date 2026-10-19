@@ -16,6 +16,11 @@ export const bookingApi = {
       .then((res) => res.data);
   },
   cancelBooking: (id, data = {}) => axiosClient.put(`/bookings/${id}/cancel`, data).then((res) => res.data),
+  respondCancelRequest: (id, data) => axiosClient.put(`/bookings/${id}/cancel-response`, data).then((res) => res.data),
+  reportNoshow: (id, data) => axiosClient.post(`/bookings/${id}/report-noshow`, data).then((res) => res.data),
+  reassignEmployee: (id, data) => axiosClient.put(`/bookings/${id}/reassign-employee`, data).then((res) => res.data),
+  respondInvite: (id, data) => axiosClient.put(`/bookings/${id}/respond-invite`, data).then((res) => res.data),
+  getMySpending: () => axiosClient.get('/bookings/my-spending').then((res) => res.data),
   updateBookingStatus: (id, status) => axiosClient.put(`/bookings/${id}`, { status }).then((res) => res.data),
 };
 

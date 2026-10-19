@@ -1,7 +1,11 @@
 import mongoose from 'mongoose';
 import Service from '../models/Service.js';
+import SystemConfig from '../models/SystemConfig.js';
 
-export const calculateBookingPrice = async (serviceIdentifier, { durationHours = 2, dynamicAttributes = {}, assigneeRole = 'helper' } = {}) => {
+export const calculateBookingPrice = async (
+  serviceIdentifier,
+  { durationHours = 2, dynamicAttributes = {}, assigneeRole = 'helper', workDate = '' } = {}
+) => {
   let service = null;
   if (serviceIdentifier?._id || serviceIdentifier?.pricing) {
     service = serviceIdentifier;
@@ -21,11 +25,18 @@ export const calculateBookingPrice = async (serviceIdentifier, { durationHours =
     throw new Error('Dịch vụ không tồn tại trong hệ thống');
   }
 
+  // Lấy cấu hình hệ thống động (Role.md Mục 14)
+  const systemConfig = await SystemConfig.findOne({ key: 'PRIMARY_CONFIG' }).catch(() => null);
+
   const pricing = service.pricing || {};
   const fields = service.bookingFormConfig?.fields || [];
   const hours = Math.max(Number(durationHours) || pricing.minHours || 2, pricing.minHours || 1);
 
-  let basePrice = hours * (pricing.pricePerHour || 0);
+  // Đơn giá giờ động từ cấu hình hệ thống (nếu có)
+  const configHourlyRate = systemConfig?.baseHourlyRates?.[service.serviceCode];
+  const pricePerHour = configHourlyRate || pricing.pricePerHour || 0;
+
+  let basePrice = hours * pricePerHour;
   const extraItems = [];
 
   fields.forEach((field) => {
@@ -84,13 +95,33 @@ export const calculateBookingPrice = async (serviceIdentifier, { durationHours =
     }
   });
 
-  const laborExtra = extraItems.filter((i) => i.type !== 'advance').reduce((sum, i) => sum + i.amount, 0);
+  let laborExtra = extraItems.filter((i) => i.type !== 'advance').reduce((sum, i) => sum + i.amount, 0);
   const advanceFee = extraItems.filter((i) => i.type === 'advance').reduce((sum, i) => sum + i.amount, 0);
+
+  let initialLabor = basePrice + laborExtra;
+
+  // Kiểm tra phụ thu ngày lễ / Tết (+20% làm tròn 1.000đ theo Role.md Mục 14)
+  if (workDate && systemConfig?.holidays && systemConfig.holidays.includes(workDate)) {
+    const multiplier = systemConfig.holidayMultiplier || 0.2;
+    const holidayFee = Math.round((initialLabor * multiplier) / 1000) * 1000;
+    if (holidayFee > 0) {
+      extraItems.push({
+        label: `Phụ thu ngày Lễ / Tết (+${Math.round(multiplier * 100)}%)`,
+        amount: holidayFee,
+        type: 'fee',
+      });
+      laborExtra += holidayFee;
+    }
+  }
 
   const laborTotal = basePrice + laborExtra;
   const totalPrice = laborTotal + advanceFee;
 
-  const feeRate = assigneeRole === 'enterprise' ? 0.12 : 0.20;
+  const defaultFeeRate = assigneeRole === 'enterprise' ? 0.12 : 0.20;
+  const feeRate = assigneeRole === 'enterprise'
+    ? (systemConfig?.enterpriseCommissionRate || 0.12)
+    : (systemConfig?.helperCommissionRate || 0.20);
+
   const platformFee = Math.round(laborTotal * feeRate);
   const helperEarnings = (laborTotal - platformFee) + advanceFee;
 

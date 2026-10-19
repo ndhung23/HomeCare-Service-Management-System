@@ -187,6 +187,9 @@ const HelpersPage = () => {
     const srv = resolveService({ service: helper.skills?.[0] || 'Dọn dẹp nhà theo giờ' }, servicesList);
     const params = new URLSearchParams();
     params.set('helper', helper.name);
+    if (helper.userId || helper.id || helper._id) {
+      params.set('workerId', helper.userId || helper.id || helper._id);
+    }
     navigate(`/services/${srv?.serviceCode || srv?.id || 'CLEANING_HOURLY'}/book?${params.toString()}`);
   };
 

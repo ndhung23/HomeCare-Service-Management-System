@@ -14,6 +14,7 @@ import kycRoutes from './routes/kycRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import disputeRoutes from './routes/disputeRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +36,7 @@ app.use('/api/kyc', kycRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/disputes', disputeRoutes);
 
 app.get('/api/test', (req, res) => {
   res.json({ message: 'API Backend is running and connected to MongoDB!' });

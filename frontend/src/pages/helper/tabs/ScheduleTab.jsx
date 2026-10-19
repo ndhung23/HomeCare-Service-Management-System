@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Calendar, MapPin, Phone, CheckCircle2, PlayCircle, Upload, X } from 'lucide-react';
+import { Calendar, MapPin, Phone, CheckCircle2, PlayCircle, Upload, X, AlertOctagon, Receipt } from 'lucide-react';
 import bookingApi from '../../../api/bookingApi';
+import disputeApi from '../../../api/disputeApi';
+import axiosClient from '../../../api/axiosClient';
 import { getBookingStatusInfo } from '../../../utils/bookingStatus';
 import { formatVND } from '../../../utils/serviceUtils';
 
@@ -12,7 +14,21 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
   const [completingBooking, setCompletingBooking] = useState(null);
   const [evidenceFiles, setEvidenceFiles] = useState([]);
   const [evidencePreviews, setEvidencePreviews] = useState([]);
+  const [actualGroceryFee, setActualGroceryFee] = useState('');
+  const [receiptFiles, setReceiptFiles] = useState([]);
   const [isSubmittingEvidence, setIsSubmittingEvidence] = useState(false);
+
+  // Absent report modal
+  const [absentBooking, setAbsentBooking] = useState(null);
+  const [absentReason, setAbsentReason] = useState('Khách không mở cửa / không liên lạc được');
+  const [absentFiles, setAbsentFiles] = useState([]);
+  const [isSubmittingAbsent, setIsSubmittingAbsent] = useState(false);
+
+  // Dispute modal
+  const [disputeBooking, setDisputeBooking] = useState(null);
+  const [disputeReason, setDisputeReason] = useState('Khách yêu cầu thêm việc ngoài hợp đồng không trả phí');
+  const [disputeDesc, setDisputeDesc] = useState('');
+  const [isSubmittingDispute, setIsSubmittingDispute] = useState(false);
 
   const handleStart = async (bookingId) => {
     if (!window.confirm('Bạn đã có mặt tại địa chỉ làm việc và muốn bấm Bắt đầu ca?')) return;
@@ -32,6 +48,8 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
     setCompletingBooking(booking);
     setEvidenceFiles([]);
     setEvidencePreviews([]);
+    setActualGroceryFee(booking.pricingSnapshot?.advanceFee || '');
+    setReceiptFiles([]);
   };
 
   const handleFileChange = (e) => {
@@ -69,6 +87,24 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
         formData.append('evidence', file);
       });
 
+      if (completingBooking.pricingSnapshot?.advanceFee > 0) {
+        formData.append('actualGroceryFee', Number(actualGroceryFee) || 0);
+        // Upload receipt images to Cloudinary if selected
+        if (receiptFiles.length > 0) {
+          for (const rf of receiptFiles) {
+            const rFormData = new FormData();
+            rFormData.append('file', rf);
+            rFormData.append('folder', 'giupviec24/receipts');
+            const uploadRes = await axiosClient.post('/kyc/upload', rFormData, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            if (uploadRes.data?.url) {
+              formData.append('groceryReceiptUrls', uploadRes.data.url);
+            }
+          }
+        }
+      }
+
       await bookingApi.completeBooking(completingBooking._id || completingBooking.id, formData);
       alert('Ca làm việc đã hoàn tất! Đơn đã chuyển sang trạng thái Chờ thanh toán.');
       setCompletingBooking(null);
@@ -77,6 +113,21 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
       alert(err.response?.data?.message || 'Có lỗi khi nộp bằng chứng');
     } finally {
       setIsSubmittingEvidence(false);
+    }
+  };
+
+  const handleRespondCancel = async (bookingId, action) => {
+    const promptText = action === 'accept'
+      ? 'Xác nhận đồng ý yêu cầu hủy ca của khách hàng (miễn phí)?'
+      : 'Xác nhận từ chối yêu cầu hủy ca?';
+    if (!window.confirm(promptText)) return;
+
+    try {
+      await bookingApi.respondCancelRequest(bookingId, { action });
+      alert('Đã phản hồi yêu cầu hủy ca!');
+      if (onDataChanged) onDataChanged();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Lỗi phản hồi yêu cầu hủy');
     }
   };
 
@@ -92,6 +143,56 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
       alert(err.response?.data?.message || 'Có lỗi khi hủy ca');
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  const handleReportAbsent = async (e) => {
+    e.preventDefault();
+    setIsSubmittingAbsent(true);
+    try {
+      let urls = [];
+      if (absentFiles.length > 0) {
+        for (const f of absentFiles) {
+          const fd = new FormData();
+          fd.append('file', f);
+          fd.append('folder', 'giupviec24/absent');
+          const r = await axiosClient.post('/kyc/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+          if (r.data?.url) urls.push(r.data.url);
+        }
+      }
+
+      await bookingApi.reportNoshow(absentBooking._id || absentBooking.id, {
+        reason: absentReason,
+        evidenceUrls: urls,
+      });
+
+      alert('Đã gửi báo cáo Khách không có mặt. Admin sẽ kiểm tra và giải quyết cho bạn.');
+      setAbsentBooking(null);
+      if (onDataChanged) onDataChanged();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Lỗi khi gửi báo cáo');
+    } finally {
+      setIsSubmittingAbsent(false);
+    }
+  };
+
+  const handleCreateDispute = async (e) => {
+    e.preventDefault();
+    if (!disputeDesc) return alert('Vui lòng mô tả chi tiết');
+    setIsSubmittingDispute(true);
+    try {
+      await disputeApi.createDispute({
+        bookingId: disputeBooking._id || disputeBooking.id,
+        reason: disputeReason,
+        description: disputeDesc,
+      });
+      alert('Đã gửi khiếu nại ca làm việc thành công!');
+      setDisputeBooking(null);
+      if (onDataChanged) onDataChanged();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Lỗi khi gửi khiếu nại');
+    } finally {
+      setIsSubmittingDispute(false);
     }
   };
 
@@ -161,6 +262,38 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
                     </span>
                   </div>
 
+                  {/* Banner Yêu Cầu Hủy Đơn 2 Chiều */}
+                  {item.cancelRequest && item.cancelRequest.requestedBy && item.cancelRequest.requestedRole !== 'helper' && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+                      <div>
+                        <p className="font-bold text-rose-800">
+                          Khách hàng yêu cầu hủy ca: "{item.cancelRequest.reason}"
+                        </p>
+                        <p className="text-rose-600 mt-0.5">Bấm đồng ý để xác nhận hủy ca miễn phí.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleRespondCancel(item._id || item.id, 'reject')}
+                          className="px-2.5 py-1 bg-white border border-rose-300 text-rose-700 font-bold rounded-lg hover:bg-rose-50"
+                        >
+                          Từ chối
+                        </button>
+                        <button
+                          onClick={() => handleRespondCancel(item._id || item.id, 'accept')}
+                          className="px-3 py-1 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-700"
+                        >
+                          Đồng ý hủy
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.cancelRequest && item.cancelRequest.requestedBy && item.cancelRequest.requestedRole === 'helper' && (
+                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                      Yêu cầu hủy ca của bạn đang chờ khách hàng xác nhận.
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -210,28 +343,55 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
                           <span>Bắt đầu ca</span>
                         </button>
                         <button
-                          onClick={() => handleCancelRequest(item._id || item.id)}
-                          className="px-3 py-1.5 border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-xl"
+                          onClick={() => setAbsentBooking(item)}
+                          className="px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-semibold rounded-xl"
+                          title="Báo khách không có mặt tại địa chỉ"
                         >
-                          Hủy ca
+                          Báo vắng mặt
                         </button>
+                        {(!item.cancelRequest || !item.cancelRequest.requestedBy) && (
+                          <button
+                            onClick={() => handleCancelRequest(item._id || item.id)}
+                            className="px-3 py-1.5 border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-xl"
+                          >
+                            Hủy ca
+                          </button>
+                        )}
                       </>
                     )}
 
                     {isInProgress && (
-                      <button
-                        onClick={() => openCompleteModal(item)}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Hoàn thành ca (Nộp ảnh)</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => openCompleteModal(item)}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Hoàn thành ca (Nộp ảnh)</span>
+                        </button>
+                        <button
+                          onClick={() => setAbsentBooking(item)}
+                          className="px-2.5 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-semibold rounded-xl"
+                        >
+                          Báo khách vắng
+                        </button>
+                      </>
                     )}
 
                     {isAwaitingPayment && (
                       <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-xl border border-amber-200">
                         Chờ khách thanh toán
                       </span>
+                    )}
+
+                    {item.status === 'COMPLETED' && (
+                      <button
+                        onClick={() => setDisputeBooking(item)}
+                        className="px-2.5 py-1 border border-purple-300 text-purple-700 hover:bg-purple-50 rounded-lg text-xs font-semibold flex items-center gap-1"
+                      >
+                        <AlertOctagon className="w-3.5 h-3.5" />
+                        Khiếu nại
+                      </button>
                     )}
                   </div>
                 </div>
@@ -254,6 +414,36 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
+
+            {/* Mục Đi chợ hộ thực tế (COOKING) */}
+            {completingBooking.pricingSnapshot?.advanceFee > 0 && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                  <Receipt className="w-4 h-4 text-amber-700" />
+                  <span>Quyết toán tiền đi chợ hộ (Ngân sách tối đa: {formatVND(completingBooking.pricingSnapshot.advanceFee)})</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-amber-800 mb-1">Số tiền thực phẩm thực tế đã chi (VNĐ):</label>
+                  <input
+                    type="number"
+                    value={actualGroceryFee}
+                    onChange={(e) => setActualGroceryFee(e.target.value)}
+                    className="w-full p-2.5 bg-white border border-amber-300 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-amber-500"
+                    placeholder="Nhập số tiền thực tế..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-amber-800 mb-1">Ảnh hóa đơn thực phẩm (tùy chọn):</label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => setReceiptFiles(Array.from(e.target.files))}
+                    className="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-800"
+                  />
+                </div>
+              </div>
+            )}
 
             <p className="text-xs text-slate-600">
               Quy định bắt buộc: Tải lên tối thiểu <strong>1 ảnh hoặc video ngắn</strong> chụp hiện trạng nhà sau khi hoàn tất dọn dẹp (tối đa 5 tệp, lưu trữ đám mây Cloudinary).
@@ -308,8 +498,89 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
           </div>
         </div>
       )}
+
+      {/* Modal Báo khách không có mặt */}
+      {absentBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <form onSubmit={handleReportAbsent} className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-base font-black text-slate-900">Báo khách không có mặt #{absentBooking.bookingCode}</h3>
+              <button type="button" onClick={() => setAbsentBooking(null)} className="p-1 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Mô tả tình huống tại hiện trường:</label>
+              <textarea
+                value={absentReason}
+                onChange={(e) => setAbsentReason(e.target.value)}
+                rows={3}
+                className="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-rose-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Ảnh chụp tại địa chỉ hiện trường (tùy chọn):</label>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => setAbsentFiles(Array.from(e.target.files))}
+                className="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-rose-50 file:text-rose-700"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t">
+              <button type="button" onClick={() => setAbsentBooking(null)} className="px-4 py-2 border rounded-xl text-xs font-bold">Hủy</button>
+              <button type="submit" disabled={isSubmittingAbsent} className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl">Gửi báo cáo</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal Khiếu nại */}
+      {disputeBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <form onSubmit={handleCreateDispute} className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-base font-black text-slate-900">Khiếu nại ca #{disputeBooking.bookingCode}</h3>
+              <button type="button" onClick={() => setDisputeBooking(null)} className="p-1 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Lý do khiếu nại:</label>
+              <select
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                className="w-full p-2.5 border rounded-xl text-sm bg-white"
+              >
+                <option value="Khách yêu cầu thêm việc ngoài hợp đồng không trả phí">Khách yêu cầu thêm việc ngoài hợp đồng không trả phí</option>
+                <option value="Thái độ khách hàng xúc phạm">Thái độ khách hàng xúc phạm</option>
+                <option value="Khách khai báo sai khối lượng công việc">Khách khai báo sai khối lượng công việc</option>
+                <option value="Vấn đề thanh toán / tiền ứng">Vấn đề thanh toán / tiền ứng</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Mô tả chi tiết:</label>
+              <textarea
+                value={disputeDesc}
+                onChange={(e) => setDisputeDesc(e.target.value)}
+                rows={3}
+                placeholder="Ghi rõ tình huống xảy ra..."
+                className="w-full p-2.5 border rounded-xl text-sm"
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t">
+              <button type="button" onClick={() => setDisputeBooking(null)} className="px-4 py-2 border rounded-xl text-xs font-bold">Hủy</button>
+              <button type="submit" disabled={isSubmittingDispute} className="px-5 py-2 bg-purple-600 text-white text-xs font-bold rounded-xl">Gửi khiếu nại</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
 
 export default ScheduleTab;
+

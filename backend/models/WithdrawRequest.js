@@ -37,6 +37,15 @@ const withdrawRequestSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    isFlagged: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    flagReason: {
+      type: String,
+      default: '',
+    },
   },
   { timestamps: true }
 );

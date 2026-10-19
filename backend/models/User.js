@@ -107,6 +107,36 @@ const userSchema = new mongoose.Schema(
         status: { type: String, enum: ['AVAILABLE', 'BUSY', 'OFF'], default: 'AVAILABLE' },
       },
     ],
+    violations: [
+      {
+        reason: { type: String, required: true },
+        bookingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', default: null },
+        bookingCode: { type: String, default: '' },
+        createdAt: { type: Date, default: Date.now },
+        removedByAdmin: { type: Boolean, default: false },
+        adminNote: { type: String, default: '' },
+      },
+    ],
+    jobClaimLockedUntil: {
+      type: Date,
+      default: null,
+    },
+    isAvailableForJobs: {
+      type: Boolean,
+      default: true,
+    },
+    servingRadiusKm: {
+      type: Number,
+      default: 10,
+    },
+    resetPasswordToken: {
+      type: String,
+      default: null,
+    },
+    resetPasswordExpire: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
