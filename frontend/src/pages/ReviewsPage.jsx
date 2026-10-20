@@ -6,7 +6,9 @@ import {
   Star, 
   CheckCircle2, 
   ThumbsUp, 
-  ShieldCheck
+  ShieldCheck,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import reviewApi from '../api/reviewApi';
 import '../styles/Home.css';
@@ -14,6 +16,8 @@ import '../styles/Home.css';
 const ReviewsPage = () => {
   const [reviews, setReviews] = useState([]);
   const [filterRating, setFilterRating] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
 
   useEffect(() => {
     reviewApi.getReviews()
@@ -21,10 +25,18 @@ const ReviewsPage = () => {
       .catch((err) => console.error('Lỗi khi tải đánh giá từ MongoDB:', err));
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterRating]);
+
   const filtered = reviews.filter((r) => {
     if (filterRating === 'all') return true;
     return r.rating >= parseFloat(filterRating);
   });
+
+  const totalPages = Math.max(1, Math.ceil((filtered.length || 0) / ITEMS_PER_PAGE));
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedReviews = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -103,52 +115,96 @@ const ReviewsPage = () => {
 
         {/* Reviews List Grid */}
         <section className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filtered.map((rev) => (
-              <div
-                key={rev.id}
-                className="bg-white rounded-3xl p-6 border border-slate-100 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={rev.avatar}
-                        alt={rev.author}
-                        className="w-12 h-12 rounded-full object-cover border border-slate-200"
-                      />
-                      <div>
-                        <div className="font-bold text-slate-900 text-sm">
-                          {rev.author}
+          {paginatedReviews.length === 0 ? (
+            <div className="py-12 text-center bg-white rounded-3xl border border-slate-100 text-slate-500">
+              Không có đánh giá nào phù hợp với bộ lọc.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {paginatedReviews.map((rev) => (
+                <div
+                  key={rev.id || rev._id}
+                  className="bg-white rounded-3xl p-6 border border-slate-100 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={rev.avatar}
+                          alt={rev.author}
+                          className="w-12 h-12 rounded-full object-cover border border-slate-200"
+                        />
+                        <div>
+                          <div className="font-bold text-slate-900 text-sm">
+                            {rev.author}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {rev.date} • Dịch vụ: <span className="text-blue-600 font-semibold">{rev.service}</span>
+                          </div>
                         </div>
-                        <div className="text-[11px] text-slate-400">
-                          {rev.date} • Dịch vụ: <span className="text-blue-600 font-semibold">{rev.service}</span>
-                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 text-amber-400">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className="w-4 h-4 fill-amber-400" />
+                        ))}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 text-amber-400">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="w-4 h-4 fill-amber-400" />
-                      ))}
-                    </div>
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
+                      "{rev.comment}"
+                    </p>
                   </div>
 
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
-                    "{rev.comment}"
-                  </p>
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                    <span>Người làm: <strong className="text-slate-700">{rev.helper}</strong></span>
+                    <button className="flex items-center gap-1 hover:text-blue-600 transition-colors">
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                      <span>Hữu ích ({rev.likes})</span>
+                    </button>
+                  </div>
                 </div>
+              ))}
+            </div>
+          )}
 
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-                  <span>Người làm: <strong className="text-slate-700">{rev.helper}</strong></span>
-                  <button className="flex items-center gap-1 hover:text-blue-600 transition-colors">
-                    <ThumbsUp className="w-3.5 h-3.5" />
-                    <span>Hữu ích ({rev.likes})</span>
+          {/* Pagination Controls */}
+          {filtered.length > 0 && totalPages > 1 && (
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-2xs">
+              <span className="text-xs text-slate-500">
+                Hiển thị {startIndex + 1} - {Math.min(startIndex + ITEMS_PER_PAGE, filtered.length)} trên {filtered.length} đánh giá
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                  >
+                    {page}
                   </button>
-                </div>
+                ))}
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </section>
 
         <BenefitsBanner />

@@ -91,3 +91,15 @@ export const deleteService = async (req, res) => {
   }
 };
 
+export const uploadServiceImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Vui lòng đính kèm file ảnh' });
+    }
+    const imageUrl = req.file.path || `/uploads/${req.file.filename}`;
+    res.json({ url: imageUrl });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi khi upload ảnh dịch vụ', error: error.message });
+  }
+};
+
