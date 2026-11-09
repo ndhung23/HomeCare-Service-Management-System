@@ -118,6 +118,8 @@ export const getBookingPaymentInfo = async (req, res) => {
 
     let transferContent = addInfo;
     let qrUrl = `https://img.vietqr.io/image/970418-${accountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(addInfo)}&accountName=${encodeURIComponent(accountName)}`;
+    let checkoutUrl = null;
+    let payosQr = null;
 
     // Thử tạo link thanh toán PayOS VietQR
     try {
