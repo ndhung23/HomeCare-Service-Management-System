@@ -116,8 +116,8 @@ export const getBookingPaymentInfo = async (req, res) => {
     // Tạo mã số thứ tự đơn hàng nguyên dương cho PayOS
     const numericOrderCode = parseInt(addInfo.replace(/\D/g, '')) || Math.floor(Date.now() / 1000);
 
-    let checkoutUrl = null;
-    let payosQr = null;
+    let transferContent = addInfo;
+    let qrUrl = `https://img.vietqr.io/image/970418-${accountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(addInfo)}&accountName=${encodeURIComponent(accountName)}`;
 
     // Thử tạo link thanh toán PayOS VietQR
     try {
@@ -132,13 +132,15 @@ export const getBookingPaymentInfo = async (req, res) => {
       if (payosRes) {
         checkoutUrl = payosRes.checkoutUrl;
         payosQr = payosRes.qrCode;
+        // Sử dụng chính xác nội dung chuyển khoản mà PayOS yêu cầu để hệ thống PayOS khớp tự động 100%
+        if (payosRes.description) {
+          transferContent = payosRes.description;
+          qrUrl = `https://img.vietqr.io/image/970418-${accountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(payosRes.description)}&accountName=${encodeURIComponent(accountName)}`;
+        }
       }
     } catch (payosErr) {
       console.log('PayOS link create note:', payosErr.message);
     }
-
-    // Link ảnh VietQR chuẩn Napas 247 BIDV
-    const qrUrl = `https://img.vietqr.io/image/970418-${accountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(addInfo)}&accountName=${encodeURIComponent(accountName)}`;
 
     res.json({
       bookingId: booking._id,
@@ -153,7 +155,7 @@ export const getBookingPaymentInfo = async (req, res) => {
         accountNo,
         accountName,
       },
-      transferContent: addInfo,
+      transferContent,
       qrUrl,
       checkoutUrl,
       payosQr,
