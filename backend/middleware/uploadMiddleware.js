@@ -19,10 +19,14 @@ if (hasCloudinary) {
   });
 }
 
-// Local disk storage setup as fallback
-const uploadDir = path.resolve('uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+// Local disk storage setup as fallback (an toàn trên serverless Vercel)
+const uploadDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.resolve('uploads');
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Fallback upload directory note:', err.message);
 }
 
 const diskStorage = multer.diskStorage({

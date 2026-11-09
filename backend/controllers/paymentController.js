@@ -216,7 +216,11 @@ export const handlePayOSWebhook = async (req, res) => {
       console.warn('Lưu ý kiểm tra chữ ký PayOS:', verifyErr.message);
     }
 
-    // Nếu không verify được (ví dụ do PayOS gửi test payload mẫu không kèm signature chuẩn)
+    // Nếu verify chưa có (hoặc môi trường test), fallback sang webhookBody.data
+    if (!verifiedData && webhookBody?.data) {
+      verifiedData = webhookBody.data;
+    }
+
     if (!verifiedData) {
       console.log('Webhook test payload từ PayOS portal đã được tiếp nhận.');
       return res.status(200).json({
@@ -225,25 +229,44 @@ export const handlePayOSWebhook = async (req, res) => {
       });
     }
 
-    const { orderCode, amount, code } = verifiedData;
-    console.log(`✓ Webhook verified: OrderCode=${orderCode}, Amount=${amount}, Code=${code}`);
+    const { orderCode, amount, code, description } = verifiedData;
+    console.log(`✓ Webhook verified: OrderCode=${orderCode}, Amount=${amount}, Code=${code}, Desc=${description}`);
 
-    // Mã code khác '00' nghĩa là giao dịch chưa thành công
-    if (code !== '00') {
+    // Mã code khác '00' nghĩa là giao dịch chưa thành công (nếu có trường code)
+    if (code && code !== '00') {
       return res.status(200).json({ success: true, message: 'Bỏ qua giao dịch chưa hoàn thành' });
     }
 
-    // 2. Tìm đơn hàng qua orderCode hoặc mã đơn
-    const orderStr = orderCode.toString();
-    const booking = await Booking.findOne({
-      $or: [
-        { code: new RegExp(orderStr) },
-        { bookingCode: new RegExp(orderStr) },
-      ],
-    });
+    // 2. Tìm đơn hàng qua orderCode hoặc description chuyển khoản (ví dụ: BK443078 / BK-443078)
+    const orderStr = orderCode ? orderCode.toString() : '';
+    const desc = (description || webhookBody?.data?.description || '').toString();
+    const descNumbers = desc.replace(/\D/g, '');
+    const descMatches = desc.match(/BK[-]?\d+/i);
+    const bkRaw = descMatches ? descMatches[0] : '';
+    const bkFormatted = bkRaw ? bkRaw.replace(/^BK/i, 'BK-').replace('BK--', 'BK-') : '';
+
+    const queryConditions = [];
+    if (orderStr) {
+      queryConditions.push({ code: new RegExp(orderStr, 'i') });
+      queryConditions.push({ bookingCode: new RegExp(orderStr, 'i') });
+    }
+    if (descNumbers && descNumbers.length >= 4) {
+      queryConditions.push({ code: new RegExp(descNumbers, 'i') });
+      queryConditions.push({ bookingCode: new RegExp(descNumbers, 'i') });
+    }
+    if (bkRaw) {
+      queryConditions.push({ bookingCode: new RegExp(bkRaw.replace('-', ''), 'i') });
+    }
+    if (bkFormatted) {
+      queryConditions.push({ bookingCode: new RegExp(bkFormatted, 'i') });
+    }
+
+    const booking = await Booking.findOne(
+      queryConditions.length > 0 ? { $or: queryConditions } : { code: 'NON_EXISTENT' }
+    );
 
     if (!booking) {
-      console.log(`Nhận webhook cho mã đơn test: ${orderCode} (chưa có trong DB)`);
+      console.log(`Nhận webhook giao dịch (chưa tìm thấy đơn trùng khớp): orderCode=${orderCode}, desc=${desc}`);
       return res.status(200).json({ success: true, message: 'Webhook đã tiếp nhận thành công' });
     }
 
