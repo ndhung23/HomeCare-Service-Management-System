@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   MapPin, 
@@ -146,6 +146,29 @@ const CustomerBookingsTab = ({ bookings, isLoading, fetchBookings }) => {
       toast.error('Không thể tải thông tin thanh toán VietQR lúc này!');
     }
   };
+
+  // Tự động nhận diện thanh toán khi tiền về tài khoản (Auto-Polling 2s/lần)
+  useEffect(() => {
+    let intervalId;
+    if (paymentModalData?.bookingId) {
+      intervalId = setInterval(async () => {
+        try {
+          const res = await axiosClient.get(`/payments/${paymentModalData.bookingId}/status`);
+          if (res.data?.isPaid || res.data?.status === 'COMPLETED') {
+            clearInterval(intervalId);
+            toast.success('🎉 Hệ thống đã nhận được tiền chuyển khoản thành công! Ca làm đã hoàn tất.');
+            setPaymentModalData(null);
+            fetchBookings();
+          }
+        } catch (err) {
+          // im lặng chờ lần poll tiếp theo
+        }
+      }, 2000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [paymentModalData, fetchBookings, toast]);
 
   const handleConfirmPayment = async () => {
     if (!paymentModalData?.bookingId) return;
@@ -608,8 +631,12 @@ const CustomerBookingsTab = ({ bookings, isLoading, fetchBookings }) => {
                 {formatVND(paymentModalData.totalPrice || paymentModalData.amount)}
               </p>
               <p className="text-xs text-slate-600">
-                Nội dung CK: <span className="font-bold text-slate-900">{paymentModalData.transferContent || paymentModalData.bookingCode}</span>
+                Nội dung CK: <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">{paymentModalData.transferContent || paymentModalData.bookingCode}</span>
               </p>
+              <div className="pt-1 flex items-center justify-center gap-1.5 text-[11px] text-blue-600 font-medium">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
+                <span>Đang tự động nhận diện giao dịch ngân hàng...</span>
+              </div>
             </div>
 
             <div className="pt-2 space-y-2 border-t border-slate-100">
