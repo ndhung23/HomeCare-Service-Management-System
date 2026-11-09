@@ -5,8 +5,10 @@ import disputeApi from '../../../api/disputeApi';
 import axiosClient from '../../../api/axiosClient';
 import { getBookingStatusInfo } from '../../../utils/bookingStatus';
 import { formatVND } from '../../../utils/serviceUtils';
+import { useToast } from '../../../context/ToastContext';
 
 const ScheduleTab = ({ bookings = [], onDataChanged }) => {
+  const { toast, confirm, prompt } = useToast();
   const [activeSubTab, setActiveSubTab] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'DONE'
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
@@ -31,14 +33,22 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
   const [isSubmittingDispute, setIsSubmittingDispute] = useState(false);
 
   const handleStart = async (bookingId) => {
-    if (!window.confirm('Bạn đã có mặt tại địa chỉ làm việc và muốn bấm Bắt đầu ca?')) return;
+    const ok = await confirm({
+      title: 'Bắt đầu ca làm việc',
+      message: 'Bạn đã có mặt tại địa chỉ làm việc và muốn bấm Bắt đầu ca ngay bây giờ?',
+      variant: 'primary',
+      confirmText: 'Bắt đầu ca',
+      cancelText: 'Chưa',
+    });
+    if (!ok) return;
+
     setActionLoadingId(bookingId);
     try {
       await bookingApi.startBooking(bookingId);
-      alert('Đã bắt đầu ca làm việc! Chúc bạn hoàn thành tốt công việc.');
+      toast.success('Đã bắt đầu ca làm việc! Chúc bạn hoàn thành tốt công việc.');
       if (onDataChanged) onDataChanged();
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi khi bắt đầu ca');
+      toast.error(err.response?.data?.message || 'Có lỗi khi bắt đầu ca');
     } finally {
       setActionLoadingId(null);
     }
@@ -55,7 +65,7 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files || []);
     if (evidenceFiles.length + files.length > 5) {
-      alert('Tối đa 5 ảnh/video bằng chứng hoàn thành ca!');
+      toast.warning('Tối đa 5 ảnh/video bằng chứng hoàn thành ca!');
       return;
     }
     const newFiles = [...evidenceFiles, ...files];
@@ -76,7 +86,7 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
   const handleCompleteSubmit = async (e) => {
     e.preventDefault();
     if (evidenceFiles.length === 0) {
-      alert('Bắt buộc tải lên tối thiểu 1 ảnh bằng chứng sau khi dọn dẹp!');
+      toast.warning('Bắt buộc tải lên tối thiểu 1 ảnh bằng chứng sau khi dọn dẹp!');
       return;
     }
 
@@ -106,41 +116,55 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
       }
 
       await bookingApi.completeBooking(completingBooking._id || completingBooking.id, formData);
-      alert('Ca làm việc đã hoàn tất! Đơn đã chuyển sang trạng thái Chờ thanh toán.');
+      toast.success('Ca làm việc đã hoàn tất! Đơn đã chuyển sang trạng thái Chờ thanh toán.');
       setCompletingBooking(null);
       if (onDataChanged) onDataChanged();
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi khi nộp bằng chứng');
+      toast.error(err.response?.data?.message || 'Có lỗi khi nộp bằng chứng');
     } finally {
       setIsSubmittingEvidence(false);
     }
   };
 
   const handleRespondCancel = async (bookingId, action) => {
-    const promptText = action === 'accept'
-      ? 'Xác nhận đồng ý yêu cầu hủy ca của khách hàng (miễn phí)?'
-      : 'Xác nhận từ chối yêu cầu hủy ca?';
-    if (!window.confirm(promptText)) return;
+    const ok = await confirm({
+      title: action === 'accept' ? 'Đồng ý hủy ca' : 'Từ chối hủy ca',
+      message: action === 'accept'
+        ? 'Xác nhận đồng ý yêu cầu hủy ca của khách hàng (miễn phí)?'
+        : 'Xác nhận từ chối yêu cầu hủy ca (ca vẫn sẽ diễn ra)?',
+      variant: action === 'accept' ? 'warning' : 'primary',
+      confirmText: action === 'accept' ? 'Đồng ý hủy' : 'Từ chối',
+      cancelText: 'Quay lại',
+    });
+    if (!ok) return;
 
     try {
       await bookingApi.respondCancelRequest(bookingId, { action });
-      alert('Đã phản hồi yêu cầu hủy ca!');
+      toast.success('Đã phản hồi yêu cầu hủy ca!');
       if (onDataChanged) onDataChanged();
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi phản hồi yêu cầu hủy');
+      toast.error(err.response?.data?.message || 'Lỗi phản hồi yêu cầu hủy');
     }
   };
 
   const handleCancelRequest = async (bookingId) => {
-    const reason = window.prompt('Nhập lý do gửi yêu cầu hủy ca:');
+    const reason = await prompt({
+      title: 'Yêu cầu hủy ca làm việc',
+      message: 'Vui lòng nhập lý do bạn muốn gửi yêu cầu hủy ca tới Khách hàng:',
+      placeholder: 'Ví dụ: Việc gia đình đột xuất...',
+      confirmText: 'Gửi yêu cầu hủy',
+      cancelText: 'Đóng',
+      required: true,
+    });
     if (!reason) return;
+
     setActionLoadingId(bookingId);
     try {
       const res = await bookingApi.cancelBooking(bookingId, { reason });
-      alert(res.message || 'Đã gửi yêu cầu hủy ca!');
+      toast.success(res.message || 'Đã gửi yêu cầu hủy ca thành công!');
       if (onDataChanged) onDataChanged();
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi khi hủy ca');
+      toast.error(err.response?.data?.message || 'Có lỗi khi hủy ca');
     } finally {
       setActionLoadingId(null);
     }
@@ -263,7 +287,7 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
                   </div>
 
                   {/* Banner Yêu Cầu Hủy Đơn 2 Chiều */}
-                  {item.cancelRequest && item.cancelRequest.requestedBy && item.cancelRequest.requestedRole !== 'helper' && (
+                  {item.cancelRequest && item.cancelRequest.requestedBy && (item.cancelRequest.status === 'PENDING' || !item.cancelRequest.status) && item.cancelRequest.requestedRole !== 'helper' && (
                     <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between gap-3 text-xs">
                       <div>
                         <p className="font-bold text-rose-800">
@@ -288,7 +312,7 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
                     </div>
                   )}
 
-                  {item.cancelRequest && item.cancelRequest.requestedBy && item.cancelRequest.requestedRole === 'helper' && (
+                  {item.cancelRequest && item.cancelRequest.requestedBy && (item.cancelRequest.status === 'PENDING' || !item.cancelRequest.status) && item.cancelRequest.requestedRole === 'helper' && (
                     <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
                       Yêu cầu hủy ca của bạn đang chờ khách hàng xác nhận.
                     </div>
@@ -349,7 +373,7 @@ const ScheduleTab = ({ bookings = [], onDataChanged }) => {
                         >
                           Báo vắng mặt
                         </button>
-                        {(!item.cancelRequest || !item.cancelRequest.requestedBy) && (
+                        {(!item.cancelRequest || !item.cancelRequest.requestedBy || item.cancelRequest.status !== 'PENDING') && (
                           <button
                             onClick={() => handleCancelRequest(item._id || item.id)}
                             className="px-3 py-1.5 border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-xl"

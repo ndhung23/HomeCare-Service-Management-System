@@ -7,6 +7,7 @@ export const authApi = {
   getAccounts: () => axiosClient.get('/auth/users').then((res) => res.data),
   addEmployee: (employeeData) => axiosClient.post('/auth/employees', employeeData).then((res) => res.data),
   updateProfile: (data) => axiosClient.put('/auth/profile', data).then((res) => res.data),
+  cancelPendingProfileUpdate: () => axiosClient.delete('/auth/profile/pending-update').then((res) => res.data),
   changePassword: (data) => axiosClient.put('/auth/change-password', data).then((res) => res.data),
   updateAvailability: (data) => axiosClient.put('/auth/availability', data).then((res) => res.data),
   forgotPassword: (email) => axiosClient.post('/auth/forgot-password', { email }).then((res) => res.data),

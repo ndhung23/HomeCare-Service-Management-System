@@ -10,7 +10,8 @@ import {
   X,
   AlertOctagon,
   RefreshCw,
-  Plus
+  Plus,
+  CheckCircle2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getBookingStatusInfo } from '../../../utils/bookingStatus';
@@ -20,12 +21,15 @@ import disputeApi from '../../../api/disputeApi';
 import reviewApi from '../../../api/reviewApi';
 import paymentApi from '../../../api/paymentApi';
 import axiosClient from '../../../api/axiosClient';
+import { useToast } from '../../../context/ToastContext';
 
 const CustomerBookingsTab = ({ bookings, isLoading, fetchBookings }) => {
+  const { toast, confirm, prompt } = useToast();
   const [filterStatus, setFilterStatus] = useState('ALL');
 
   // Modals
   const [paymentModalData, setPaymentModalData] = useState(null);
+  const [isPaying, setIsPaying] = useState(false);
   const [evidenceModalPhotos, setEvidenceModalPhotos] = useState(null);
   
   // Review modal
@@ -49,47 +53,88 @@ const CustomerBookingsTab = ({ bookings, isLoading, fetchBookings }) => {
 
   const handleCancel = async (booking) => {
     const isPending = booking.status === 'PENDING' || booking.status === 'Chờ người nhận';
-    const confirmPrompt = isPending
-      ? 'Bạn có chắc chắn muốn hủy đơn dịch vụ này (Miễn phí)?'
-      : 'Đơn đã có người nhận. Bạn có muốn gửi yêu cầu hủy đơn tới Người giúp việc để hai bên đồng thuận?';
-
-    if (!window.confirm(confirmPrompt)) return;
-    const reason = window.prompt('Nhập lý do hủy đơn (tùy chọn):') || 'Khách hàng thay đổi kế hoạch';
+    
+    let reason = '';
+    if (isPending) {
+      const ok = await confirm({
+        title: 'Hủy đơn dịch vụ',
+        message: 'Bạn có chắc chắn muốn hủy đơn dịch vụ này? (Miễn phí hủy ngay)',
+        variant: 'danger',
+        confirmText: 'Xác nhận hủy',
+        cancelText: 'Giữ đơn',
+      });
+      if (!ok) return;
+      reason = 'Khách hàng tự hủy khi chưa có người nhận';
+    } else {
+      const inputReason = await prompt({
+        title: 'Gửi yêu cầu hủy đơn',
+        message: 'Đơn đã có người nhận. Vui lòng nhập lý do bạn muốn hủy đơn để gửi tới Người giúp việc xác nhận:',
+        placeholder: 'Ví dụ: Thay đổi kế hoạch đột xuất...',
+        confirmText: 'Gửi yêu cầu hủy',
+        cancelText: 'Đóng',
+        required: true,
+      });
+      if (!inputReason) return;
+      reason = inputReason;
+    }
 
     try {
       const res = await bookingApi.cancelBooking(booking._id || booking.id, { reason });
-      alert(res.message || 'Thao tác hủy đơn thành công!');
+      toast.success(res.message || 'Thao tác hủy đơn thành công!');
       fetchBookings();
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra khi hủy đơn!');
+      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi hủy đơn!');
     }
   };
 
   const handleRespondCancel = async (bookingId, action) => {
-    const promptText = action === 'accept'
-      ? 'Xác nhận đồng ý hủy đơn dịch vụ này (miễn phí)?'
-      : 'Xác nhận từ chối yêu cầu hủy đơn (ca làm việc vẫn diễn ra)?';
-    if (!window.confirm(promptText)) return;
+    if (action === 'accept') {
+      const ok = await confirm({
+        title: 'Xác nhận hủy ca làm việc',
+        message: 'Bạn có chắc chắn đồng ý yêu cầu hủy của người làm? Đơn dịch vụ sẽ được đưa trở lại Chợ việc làm để người giúp việc khác tiếp nhận.',
+        variant: 'warning',
+        confirmText: 'Đồng ý (Đưa về chợ)',
+        cancelText: 'Quay lại',
+      });
+      if (!ok) return;
+    } else {
+      const ok = await confirm({
+        title: 'Từ chối yêu cầu hủy ca',
+        message: 'Bạn có chắc muốn từ chối yêu cầu hủy ca? Người làm vẫn sẽ thực hiện ca theo đúng lịch hẹn.',
+        variant: 'primary',
+        confirmText: 'Từ chối hủy',
+        cancelText: 'Quay lại',
+      });
+      if (!ok) return;
+    }
 
     try {
-      await bookingApi.respondCancelRequest(bookingId, { action });
-      alert('Đã phản hồi yêu cầu hủy thành công!');
+      const res = await bookingApi.respondCancelRequest(bookingId, { action });
+      toast.success(res.message || 'Đã phản hồi yêu cầu hủy thành công!');
       fetchBookings();
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi khi phản hồi yêu cầu hủy');
+      toast.error(err.response?.data?.message || 'Lỗi khi phản hồi yêu cầu hủy');
     }
   };
 
   const handleReportNoshow = async (booking) => {
-    if (!window.confirm('Xác nhận báo cáo người giúp việc vắng mặt quá 30 phút sau giờ hẹn? Ca sẽ được đẩy lại Chợ việc làm.')) return;
+    const ok = await confirm({
+      title: 'Báo cáo vắng mặt (No-show)',
+      message: 'Xác nhận báo cáo người giúp việc không đến sau quá 30 phút giờ hẹn? Đơn sẽ tự động được hoàn trả về Chợ việc làm để tìm người thay thế.',
+      variant: 'danger',
+      confirmText: 'Báo cáo vắng mặt',
+      cancelText: 'Hủy bỏ',
+    });
+    if (!ok) return;
+
     try {
-      await bookingApi.reportNoshow(booking._id || booking.id, {
+      const res = await bookingApi.reportNoshow(booking._id || booking.id, {
         reason: 'Khách báo người làm vắng mặt quá 30 phút sau giờ hẹn',
       });
-      alert('Đã ghi nhận báo cáo vắng mặt. Ca đã được đẩy lại Chợ việc làm để tìm người thay thế.');
+      toast.success(res.message || 'Đã ghi nhận báo cáo vắng mặt. Ca đã được hoàn về Chợ việc làm.');
       fetchBookings();
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi khi báo vắng mặt');
+      toast.error(err.response?.data?.message || 'Lỗi khi báo vắng mặt');
     }
   };
 
@@ -98,7 +143,22 @@ const CustomerBookingsTab = ({ bookings, isLoading, fetchBookings }) => {
       const data = await paymentApi.getPaymentInfo(booking._id || booking.id);
       setPaymentModalData(data);
     } catch (err) {
-      alert('Không thể tải thông tin thanh toán VietQR lúc này!');
+      toast.error('Không thể tải thông tin thanh toán VietQR lúc này!');
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!paymentModalData?.bookingId) return;
+    setIsPaying(true);
+    try {
+      const res = await paymentApi.payBooking(paymentModalData.bookingId);
+      toast.success(res.message || 'Thanh toán thành công! Tiền thu nhập đã vào ví người giúp việc.');
+      setPaymentModalData(null);
+      fetchBookings();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi xử lý thanh toán!');
+    } finally {
+      setIsPaying(false);
     }
   };
 
@@ -239,7 +299,7 @@ const CustomerBookingsTab = ({ bookings, isLoading, fetchBookings }) => {
             const isPending = b.status === 'PENDING' || b.status === 'Chờ người nhận';
             
             // Check mutual cancel request
-            const hasCancelReq = b.cancelRequest && b.cancelRequest.requestedBy;
+            const hasCancelReq = b.cancelRequest && b.cancelRequest.requestedBy && (b.cancelRequest.status === 'PENDING' || !b.cancelRequest.status);
             const cancelReqFromWorker = hasCancelReq && b.cancelRequest.requestedRole !== 'customer';
             const cancelReqFromMe = hasCancelReq && b.cancelRequest.requestedRole === 'customer';
 
@@ -255,26 +315,28 @@ const CustomerBookingsTab = ({ bookings, isLoading, fetchBookings }) => {
               <div key={b._id || b.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
                 {/* Banner Yêu Cầu Hủy Đơn 2 Chiều */}
                 {cancelReqFromWorker && (
-                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                     <div>
-                      <p className="font-bold text-rose-800 flex items-center gap-1.5">
-                        <AlertTriangle className="w-4 h-4 text-rose-600" />
+                      <p className="font-bold text-amber-800 flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-600" />
                         Người làm gửi yêu cầu hủy ca: "{b.cancelRequest.reason}"
                       </p>
-                      <p className="text-rose-600 mt-0.5">SĐT người làm: {b.helperPhone || 'Chưa cập nhật'}. Bấm đồng ý để hủy đơn miễn phí.</p>
+                      <p className="text-amber-700 mt-0.5">
+                        SĐT người làm: {b.helperPhone || 'Chưa cập nhật'}. Bấm đồng ý để giải phóng người làm và đưa đơn trở lại Chợ việc làm.
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleRespondCancel(b._id, 'reject')}
-                        className="px-3 py-1.5 bg-white border border-rose-300 text-rose-700 font-semibold rounded-lg hover:bg-rose-50"
+                        className="px-3 py-1.5 bg-white border border-amber-300 text-amber-800 font-semibold rounded-lg hover:bg-amber-100"
                       >
                         Từ chối hủy
                       </button>
                       <button
                         onClick={() => handleRespondCancel(b._id, 'accept')}
-                        className="px-3 py-1.5 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-700 shadow-sm"
+                        className="px-3 py-1.5 bg-amber-600 text-white font-bold rounded-lg hover:bg-amber-700 shadow-sm"
                       >
-                        Đồng ý hủy đơn
+                        Đồng ý (Đưa về chợ)
                       </button>
                     </div>
                   </div>
@@ -519,13 +581,62 @@ const CustomerBookingsTab = ({ bookings, isLoading, fetchBookings }) => {
 
       {/* Modal VietQR Thanh toán */}
       {paymentModalData && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
-            <h3 className="font-bold text-gray-900 text-base">Thanh toán qua VietQR</h3>
-            <img src={paymentModalData.qrUrl} alt="VietQR" className="w-56 h-56 mx-auto rounded-xl border p-2" />
-            <p className="text-xl font-black text-emerald-600">{formatVND(paymentModalData.amount)}</p>
-            <p className="text-xs text-gray-500">Nội dung CK: <span className="font-bold text-gray-800">{paymentModalData.bookingCode}</span></p>
-            <button onClick={() => setPaymentModalData(null)} className="w-full py-2.5 bg-gray-900 text-white font-bold rounded-xl text-sm">Đã thanh toán</button>
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-slate-100 scale-in-center">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-black text-slate-900 text-base">Thanh toán ca #{paymentModalData.bookingCode}</h3>
+              <button
+                onClick={() => setPaymentModalData(null)}
+                className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+              <img
+                src={paymentModalData.qrUrl}
+                alt="VietQR"
+                className="w-56 h-56 mx-auto rounded-xl border bg-white p-2 shadow-xs"
+              />
+              <p className="text-[11px] text-slate-500 mt-2 font-medium">Quét mã bằng app ngân hàng bất kỳ để chuyển khoản</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs text-slate-500 font-semibold">Tổng tiền thanh toán</p>
+              <p className="text-2xl font-black text-emerald-600">
+                {formatVND(paymentModalData.totalPrice || paymentModalData.amount)}
+              </p>
+              <p className="text-xs text-slate-600">
+                Nội dung CK: <span className="font-bold text-slate-900">{paymentModalData.transferContent || paymentModalData.bookingCode}</span>
+              </p>
+            </div>
+
+            <div className="pt-2 space-y-2 border-t border-slate-100">
+              <button
+                onClick={handleConfirmPayment}
+                disabled={isPaying}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+              >
+                {isPaying ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Đang xử lý thanh toán...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Xác nhận đã thanh toán</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setPaymentModalData(null)}
+                className="w-full py-2 text-slate-500 hover:text-slate-700 font-bold rounded-xl text-xs transition-colors"
+              >
+                Để thanh toán sau
+              </button>
+            </div>
           </div>
         </div>
       )}

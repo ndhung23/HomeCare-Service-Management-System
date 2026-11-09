@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { formatVND } from '../../../utils/serviceUtils';
 import adminApi from '../../../api/adminApi';
+import { useToast } from '../../../context/ToastContext';
 
 const PaymentsAndWithdrawsTab = ({
   awaitingBookings,
@@ -29,34 +30,52 @@ const PaymentsAndWithdrawsTab = ({
   withdraws,
   fetchWithdraws,
 }) => {
+  const { toast, confirm, prompt } = useToast();
   const [activeSection, setActiveSection] = useState('PAYMENT'); // 'PAYMENT' | 'WITHDRAW'
   const [activeEvidenceModal, setActiveEvidenceModal] = useState(null);
   const [isProcessingWithdraw, setIsProcessingWithdraw] = useState(null);
 
   const handleApproveWithdraw = async (id) => {
-    if (!window.confirm('Xác nhận đã chuyển khoản cho người nhận và phê duyệt lệnh rút này?')) return;
+    const ok = await confirm({
+      title: 'Phê duyệt lệnh rút tiền',
+      message: 'Xác nhận bạn đã chuyển khoản ngân hàng cho người nhận và muốn phê duyệt lệnh rút tiền này?',
+      variant: 'primary',
+      confirmText: 'Xác nhận duyệt',
+      cancelText: 'Đóng',
+    });
+    if (!ok) return;
+
     setIsProcessingWithdraw(id);
     try {
       await adminApi.approveWithdraw(id);
-      alert('Đã phê duyệt lệnh rút tiền thành công!');
+      toast.success('Đã phê duyệt lệnh rút tiền thành công!');
       fetchWithdraws();
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi khi phê duyệt lệnh rút');
+      toast.error(err.response?.data?.message || 'Lỗi khi phê duyệt lệnh rút');
     } finally {
       setIsProcessingWithdraw(null);
     }
   };
 
   const handleRejectWithdraw = async (id) => {
-    const reason = window.prompt('Nhập lý do từ chối lệnh rút tiền (tiền sẽ hoàn về ví):', 'Thông tin ngân hàng không khớp');
+    const reason = await prompt({
+      title: 'Từ chối lệnh rút tiền',
+      message: 'Vui lòng nhập lý do từ chối (tiền rút sẽ được hoàn trả lại ví khả dụng của người dùng):',
+      placeholder: 'Ví dụ: Số tài khoản không tồn tại, tên không khớp...',
+      defaultValue: 'Thông tin tài khoản ngân hàng không hợp lệ',
+      confirmText: 'Từ chối và hoàn tiền',
+      cancelText: 'Hủy bỏ',
+      required: true,
+    });
     if (!reason) return;
+
     setIsProcessingWithdraw(id);
     try {
       await adminApi.rejectWithdraw(id, reason);
-      alert('Đã từ chối lệnh rút và hoàn tiền về ví người dùng!');
+      toast.success('Đã từ chối lệnh rút và hoàn trả tiền về ví người dùng!');
       fetchWithdraws();
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi khi từ chối lệnh rút');
+      toast.error(err.response?.data?.message || 'Lỗi khi từ chối lệnh rút');
     } finally {
       setIsProcessingWithdraw(null);
     }

@@ -117,6 +117,53 @@ const userSchema = new mongoose.Schema(
         adminNote: { type: String, default: '' },
       },
     ],
+    gender: {
+      type: String,
+      default: '',
+    },
+    dob: {
+      type: String,
+      default: '',
+    },
+    bio: {
+      type: String,
+      default: '',
+    },
+    experience: {
+      type: String,
+      default: '',
+    },
+    hourlyRate: {
+      type: Number,
+      default: 0,
+    },
+    skills: [
+      {
+        type: String,
+      },
+    ],
+    pendingProfileUpdate: {
+      status: {
+        type: String,
+        enum: ['NONE', 'PENDING', 'APPROVED', 'REJECTED'],
+        default: 'NONE',
+      },
+      data: {
+        name: { type: String, default: '' },
+        phone: { type: String, default: '' },
+        address: { type: String, default: '' },
+        avatar: { type: String, default: '' },
+        bio: { type: String, default: '' },
+        experience: { type: String, default: '' },
+        hourlyRate: { type: Number, default: 0 },
+        skills: [{ type: String }],
+        gender: { type: String, default: '' },
+        dob: { type: String, default: '' },
+      },
+      requestedAt: { type: Date, default: null },
+      reviewedAt: { type: Date, default: null },
+      rejectReason: { type: String, default: '' },
+    },
     jobClaimLockedUntil: {
       type: Date,
       default: null,

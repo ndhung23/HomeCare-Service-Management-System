@@ -234,7 +234,7 @@ const ScheduleTab = ({ companyBookings = [], isLoading = false, onRefresh, emplo
               >
                 <div className="space-y-2 flex-1">
                   {/* Banner Yêu Cầu Hủy */}
-                  {b.cancelRequest && b.cancelRequest.requestedBy && b.cancelRequest.requestedRole !== 'enterprise' && (
+                  {b.cancelRequest && b.cancelRequest.requestedBy && (b.cancelRequest.status === 'PENDING' || !b.cancelRequest.status) && b.cancelRequest.requestedRole !== 'enterprise' && (
                     <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between gap-3 text-xs mb-2">
                       <div>
                         <p className="font-bold text-rose-800">Khách hàng yêu cầu hủy ca: "{b.cancelRequest.reason}"</p>

@@ -337,26 +337,89 @@ export const cancelBooking = async (req, res) => {
 
       // Nếu đã có yêu cầu hủy từ bên kia -> Xác nhận hủy thành công
       if (booking.cancelRequest && booking.cancelRequest.requestedBy && booking.cancelRequest.requestedRole !== user.role) {
-        booking.status = 'CANCELLED';
-        booking.statusColor = 'rose';
-        booking.cancelRequest = {
-          requestedBy: booking.cancelRequest.requestedBy,
-          requestedRole: booking.cancelRequest.requestedRole,
-          reason: `${booking.cancelRequest.reason} (Đã được ${user.name} xác nhận hủy)`,
-          requestedAt: new Date(),
-        };
-        const saved = await booking.save();
+        const isRequestedByWorker = booking.cancelRequest.requestedRole !== 'customer';
 
-        // Gửi thông báo cho cả 2 bên
-        return res.json({
-          success: true,
-          message: 'Hai bên đã đồng thuận xác nhận hủy đơn. Đơn đã được hủy miễn phí.',
-          booking: saved,
-        });
+        if (isRequestedByWorker) {
+          // Người làm/doanh nghiệp xin hủy ca, khách hàng đồng ý -> Đơn quay trở lại Chợ việc làm
+          booking.status = 'PENDING';
+          booking.statusColor = 'amber';
+          booking.dispatchMode = 'MARKET';
+
+          const previousWorkerName = booking.helper || booking.cancelRequest.requestedBy;
+          const cancelReason = booking.cancelRequest.reason;
+          const previousAssigneeId = booking.assigneeId;
+
+          booking.assigneeId = null;
+          booking.assigneeType = null;
+          booking.workerId = null;
+          booking.helper = '';
+          booking.helperPhone = '';
+          booking.acceptedBy = '';
+          booking.acceptedAt = null;
+          booking.assignedEmployee = { id: '', name: '', phone: '', avatar: '' };
+
+          booking.cancelRequest = {
+            status: 'APPROVED',
+            requestedBy: '',
+            requestedRole: '',
+            reason: '',
+            respondedAt: new Date(),
+            responseNote: `Khách hàng (${user.name}) xác nhận đồng ý yêu cầu hủy ca của ${previousWorkerName}. Đơn hoàn trả về Chợ việc làm.`,
+          };
+          booking.notes = (booking.notes ? booking.notes + ' | ' : '') + `Người làm (${previousWorkerName}) xin hủy ca (Lý do: "${cancelReason}"). Khách hàng đồng ý, đơn hoàn trả về Chợ việc làm.`;
+          const saved = await booking.save();
+
+          if (previousAssigneeId) {
+            await Notification.create({
+              userId: previousAssigneeId,
+              title: 'Yêu cầu hủy ca đã được chấp thuận',
+              message: `Khách hàng ${user.name} đã đồng ý yêu cầu hủy ca #${booking.bookingCode} của bạn. Ca làm việc đã được giải phóng và hoàn về Chợ việc làm (miễn phí, không phạt).`,
+              type: 'INFO',
+              link: user.role === 'customer' ? '/helper' : '/customer',
+            }).catch(() => {});
+          }
+
+          return res.json({
+            success: true,
+            message: 'Đã chấp thuận yêu cầu hủy ca của người làm. Đơn dịch vụ đã được đưa trở lại Chợ việc làm để người khác tiếp nhận.',
+            booking: saved,
+          });
+        } else {
+          // Khách hàng xin hủy, người làm đồng ý -> Hủy đơn hoàn toàn
+          booking.status = 'CANCELLED';
+          booking.statusColor = 'rose';
+          booking.cancelRequest = {
+            status: 'APPROVED',
+            requestedBy: '',
+            requestedRole: '',
+            reason: `${booking.cancelRequest.reason} (Đã được ${user.name} xác nhận hủy)`,
+            requestedAt: booking.cancelRequest.requestedAt,
+            respondedAt: new Date(),
+            responseNote: `Người làm (${user.name}) xác nhận hủy đơn theo yêu cầu của khách hàng.`,
+          };
+          const saved = await booking.save();
+
+          if (booking.customerId) {
+            await Notification.create({
+              userId: booking.customerId,
+              title: 'Đơn dịch vụ đã được hủy',
+              message: `${user.name} đã xác nhận đồng ý yêu cầu hủy đơn #${booking.bookingCode}. Đơn đã được hủy thành công (miễn phí).`,
+              type: 'INFO',
+              link: '/customer',
+            }).catch(() => {});
+          }
+
+          return res.json({
+            success: true,
+            message: 'Hai bên đã đồng thuận xác nhận hủy đơn. Đơn đã được hủy miễn phí.',
+            booking: saved,
+          });
+        }
       }
 
       // Chưa có yêu cầu hủy -> Tạo yêu cầu hủy và gửi cho bên kia
       booking.cancelRequest = {
+        status: 'PENDING',
         requestedBy: user.name,
         requestedRole: user.role,
         reason: reason || 'Yêu cầu hủy từ người dùng',
@@ -411,25 +474,75 @@ export const respondCancelRequest = async (req, res) => {
     }
 
     if (action === 'accept') {
-      booking.status = 'CANCELLED';
-      booking.statusColor = 'rose';
-      booking.cancelRequest.status = 'APPROVED';
-      booking.cancelRequest.respondedAt = new Date();
-      booking.cancelRequest.responseNote = note;
-      const saved = await booking.save();
+      const isRequestedByWorker = booking.cancelRequest.requestedRole !== 'customer';
 
-      const notifyTarget = user.role === 'customer' ? booking.assigneeId : booking.customerId;
-      if (notifyTarget) {
-        await Notification.create({
-          userId: notifyTarget,
-          title: 'Yêu cầu hủy đơn đã được chấp thuận',
-          message: `${user.name} đã đồng ý hủy đơn #${booking.bookingCode}. Đơn đã được hủy thành công (miễn phí).`,
-          type: 'INFO',
-          link: user.role === 'customer' ? '/helper' : '/customer',
-        }).catch(() => {});
+      if (isRequestedByWorker) {
+        // Người làm xin hủy ca, khách hàng đồng ý -> Trở về Chợ việc làm (PENDING)
+        booking.status = 'PENDING';
+        booking.statusColor = 'amber';
+        booking.dispatchMode = 'MARKET';
+
+        const previousWorkerName = booking.helper || booking.cancelRequest.requestedBy;
+        const cancelReason = booking.cancelRequest.reason;
+        const previousAssigneeId = booking.assigneeId;
+
+        booking.assigneeId = null;
+        booking.assigneeType = null;
+        booking.workerId = null;
+        booking.helper = '';
+        booking.helperPhone = '';
+        booking.acceptedBy = '';
+        booking.acceptedAt = null;
+        booking.assignedEmployee = { id: '', name: '', phone: '', avatar: '' };
+
+        booking.cancelRequest = {
+          status: 'APPROVED',
+          requestedBy: '',
+          requestedRole: '',
+          reason: '',
+          respondedAt: new Date(),
+          responseNote: note || `Khách hàng (${user.name}) chấp thuận yêu cầu hủy ca của ${previousWorkerName}. Đơn hoàn trả về Chợ việc làm.`,
+        };
+        booking.notes = (booking.notes ? booking.notes + ' | ' : '') + `Người làm (${previousWorkerName}) xin hủy ca (Lý do: "${cancelReason}"). Khách hàng đồng ý, đơn hoàn trả về Chợ việc làm.`;
+        const saved = await booking.save();
+
+        if (previousAssigneeId) {
+          await Notification.create({
+            userId: previousAssigneeId,
+            title: 'Yêu cầu hủy ca đã được chấp thuận',
+            message: `Khách hàng ${user.name} đã đồng ý yêu cầu hủy ca #${booking.bookingCode} của bạn. Ca làm việc đã được hoàn về Chợ việc làm (miễn phí, không phạt).`,
+            type: 'INFO',
+            link: '/helper',
+          }).catch(() => {});
+        }
+
+        return res.json({
+          success: true,
+          message: 'Đã chấp thuận yêu cầu hủy ca của người làm. Đơn đã được đưa trở lại Chợ việc làm để người khác nhận.',
+          booking: saved,
+        });
+      } else {
+        // Khách hàng yêu cầu hủy, người làm chấp thuận -> Hủy đơn hoàn toàn (CANCELLED)
+        booking.status = 'CANCELLED';
+        booking.statusColor = 'rose';
+        booking.cancelRequest.status = 'APPROVED';
+        booking.cancelRequest.requestedBy = '';
+        booking.cancelRequest.respondedAt = new Date();
+        booking.cancelRequest.responseNote = note;
+        const saved = await booking.save();
+
+        if (booking.customerId) {
+          await Notification.create({
+            userId: booking.customerId,
+            title: 'Yêu cầu hủy đơn đã được chấp thuận',
+            message: `${user.name} đã đồng ý hủy đơn #${booking.bookingCode}. Đơn đã được hủy thành công (miễn phí).`,
+            type: 'INFO',
+            link: '/customer',
+          }).catch(() => {});
+        }
+
+        return res.json({ success: true, message: 'Đã chấp thuận hủy đơn dịch vụ (miễn phí)', booking: saved });
       }
-
-      return res.json({ success: true, message: 'Đã chấp thuận hủy đơn dịch vụ', booking: saved });
     } else {
       booking.cancelRequest.status = 'REJECTED';
       booking.cancelRequest.respondedAt = new Date();

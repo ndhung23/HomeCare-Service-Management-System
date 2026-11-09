@@ -353,3 +353,129 @@ export const removeUserViolation = async (req, res) => {
   }
 };
 
+// ==========================================
+// QUẢN LÝ XÁC THỰC CẬP NHẬT HỒ SƠ (HELPER & DOANH NGHIỆP)
+// ==========================================
+
+// Danh sách yêu cầu sửa hồ sơ đang chờ duyệt
+export const getPendingProfileUpdates = async (req, res) => {
+  try {
+    const users = await User.find({ 'pendingProfileUpdate.status': 'PENDING' })
+      .select('name email role roleName phone address avatar bio experience hourlyRate skills pendingProfileUpdate kycLevel status createdAt')
+      .sort({ 'pendingProfileUpdate.requestedAt': -1 });
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi tải danh sách yêu cầu cập nhật hồ sơ', error: error.message });
+  }
+};
+
+// Phê duyệt yêu cầu sửa thông tin hồ sơ
+export const approveProfileUpdate = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+
+    if (!user.pendingProfileUpdate || user.pendingProfileUpdate.status !== 'PENDING') {
+      return res.status(400).json({ message: 'Người dùng không có yêu cầu sửa hồ sơ nào đang chờ duyệt' });
+    }
+
+    const { data } = user.pendingProfileUpdate;
+    if (data) {
+      if (data.name) user.name = data.name.trim();
+      if (data.phone !== undefined) user.phone = data.phone.trim();
+      if (data.address !== undefined) user.address = data.address.trim();
+      if (data.avatar) user.avatar = data.avatar;
+      if (data.gender !== undefined) user.gender = data.gender;
+      if (data.dob !== undefined) user.dob = data.dob;
+      if (data.bio !== undefined) user.bio = data.bio;
+      if (data.experience !== undefined) user.experience = data.experience;
+      if (data.hourlyRate !== undefined) user.hourlyRate = Number(data.hourlyRate);
+      if (data.skills && Array.isArray(data.skills)) user.skills = data.skills;
+    }
+
+    user.pendingProfileUpdate.status = 'APPROVED';
+    user.pendingProfileUpdate.reviewedAt = new Date();
+    user.pendingProfileUpdate.rejectReason = '';
+
+    await user.save();
+
+    // Đồng bộ sang bảng Worker nếu người dùng là helper
+    if (user.role === 'helper') {
+      const worker = await Worker.findOne({ userId: user._id });
+      if (worker) {
+        worker.name = user.name;
+        if (user.phone) worker.phone = user.phone;
+        if (user.avatar) worker.avatar = user.avatar;
+        if (user.bio) worker.bio = user.bio;
+        if (user.experience) worker.experience = user.experience;
+        if (user.skills && user.skills.length > 0) worker.skills = user.skills;
+        if (user.hourlyRate > 0) worker.hourlyRate = user.hourlyRate;
+        await worker.save();
+      }
+    }
+
+    // Gửi thông báo cho người dùng
+    await Notification.create({
+      userId: user._id,
+      title: 'Hồ sơ cá nhân đã được Admin xác thực thành công!',
+      message: 'Các thông tin cập nhật hồ sơ của bạn đã được Ban quản trị phê duyệt và cập nhật chính thức.',
+      type: 'PROFILE_UPDATE',
+      link: user.role === 'enterprise' ? '/enterprise' : '/helper',
+    }).catch(() => {});
+
+    res.json({
+      success: true,
+      message: `Đã phê duyệt thay đổi thông tin hồ sơ cho ${user.name} thành công!`,
+      user,
+    });
+  } catch (error) {
+    console.error('Approve profile update error:', error);
+    res.status(500).json({ message: 'Lỗi phê duyệt hồ sơ', error: error.message });
+  }
+};
+
+// Từ chối yêu cầu sửa thông tin hồ sơ
+export const rejectProfileUpdate = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { reason = 'Thông tin cập nhật chưa trùng khớp hoặc chưa đạt tiêu chuẩn xác minh' } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+
+    if (!user.pendingProfileUpdate || user.pendingProfileUpdate.status !== 'PENDING') {
+      return res.status(400).json({ message: 'Người dùng không có yêu cầu sửa hồ sơ nào đang chờ duyệt' });
+    }
+
+    user.pendingProfileUpdate.status = 'REJECTED';
+    user.pendingProfileUpdate.rejectReason = reason;
+    user.pendingProfileUpdate.reviewedAt = new Date();
+
+    await user.save();
+
+    // Gửi thông báo cho người dùng
+    await Notification.create({
+      userId: user._id,
+      title: 'Yêu cầu cập nhật hồ sơ chưa được chấp thuận',
+      message: `Yêu cầu thay đổi thông tin của bạn bị từ chối với lý do: "${reason}". Vui lòng kiểm tra lại.`,
+      type: 'PROFILE_UPDATE',
+      link: user.role === 'enterprise' ? '/enterprise' : '/helper',
+    }).catch(() => {});
+
+    res.json({
+      success: true,
+      message: 'Đã từ chối yêu cầu cập nhật hồ sơ và gửi thông báo cho đối tác.',
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi từ chối hồ sơ', error: error.message });
+  }
+};
+

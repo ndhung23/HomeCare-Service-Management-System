@@ -12,6 +12,9 @@ import {
   createOrUpdateContentItem,
   deleteContentItem,
   removeUserViolation,
+  getPendingProfileUpdates,
+  approveProfileUpdate,
+  rejectProfileUpdate,
 } from '../controllers/adminController.js';
 import { confirmPaymentByAdmin, getAdminPaymentsList, rejectPaymentByAdmin } from '../controllers/paymentController.js';
 import {
@@ -42,6 +45,11 @@ router.delete('/users/:userId/violations/:violationId', removeUserViolation);
 router.get('/kyc/pending', getPendingKycList);
 router.put('/kyc/:userId/approve', approveKyc);
 router.put('/kyc/:userId/reject', rejectKyc);
+
+// Quản lý xác thực cập nhật hồ sơ (Helper / Doanh nghiệp)
+router.get('/profile-updates/pending', getPendingProfileUpdates);
+router.put('/profile-updates/:userId/approve', approveProfileUpdate);
+router.put('/profile-updates/:userId/reject', rejectProfileUpdate);
 
 // Quản lý duyệt thanh toán (VietQR đối soát / VNPay sau này)
 router.get('/payments', getAdminPaymentsList);

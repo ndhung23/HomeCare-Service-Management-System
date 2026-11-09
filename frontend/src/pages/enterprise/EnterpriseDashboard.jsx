@@ -5,7 +5,8 @@ import {
   Users, 
   CalendarCheck, 
   DollarSign, 
-  Clock 
+  Clock,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import bookingApi from '../../api/bookingApi';
@@ -17,6 +18,7 @@ import MarketTab from './tabs/MarketTab';
 import ScheduleTab from './tabs/ScheduleTab';
 import EmployeesTab from './tabs/EmployeesTab';
 import WalletTab from './tabs/WalletTab';
+import ProfileSettingsTab from '../helper/tabs/ProfileSettingsTab';
 
 const EnterpriseDashboard = () => {
   const { user } = useAuth();
@@ -79,6 +81,15 @@ const EnterpriseDashboard = () => {
     { key: 'SCHEDULE', label: 'Lịch ca & Hợp đồng', active: activeTab === 'SCHEDULE', onClick: () => setActiveTab('SCHEDULE'), icon: CalendarCheck, badge: companyBookings.length > 0 ? `${companyBookings.length}` : null },
     { key: 'EMPLOYEES', label: 'Đội ngũ Nhân sự B2B', active: activeTab === 'EMPLOYEES', onClick: () => setActiveTab('EMPLOYEES'), icon: Users, badge: employees.length > 0 ? `${employees.length}` : null },
     { key: 'WALLET', label: 'Ví & Doanh thu Sàn', active: activeTab === 'WALLET', onClick: () => setActiveTab('WALLET'), icon: DollarSign },
+    { 
+      key: 'SETTINGS', 
+      label: 'Hồ sơ & Cài đặt', 
+      active: activeTab === 'SETTINGS', 
+      onClick: () => setActiveTab('SETTINGS'), 
+      icon: Settings,
+      badge: currentUser?.pendingProfileUpdate?.status === 'PENDING' ? 'Chờ duyệt' : null,
+      badgeColor: 'amber'
+    },
   ];
 
   const availableBalance = walletData?.wallet?.available ?? (currentUser?.wallet?.available || 0);
@@ -203,6 +214,13 @@ const EnterpriseDashboard = () => {
           availableBalance={availableBalance}
           bankInfo={currentUser?.bank}
           onRefresh={fetchData}
+        />
+      )}
+
+      {activeTab === 'SETTINGS' && (
+        <ProfileSettingsTab
+          user={currentUser}
+          onUserUpdated={fetchData}
         />
       )}
     </DashboardLayout>

@@ -26,6 +26,7 @@ export const getBookingPaymentInfo = async (req, res) => {
       bookingCode: booking.bookingCode,
       service: booking.service,
       totalPrice: amount,
+      amount: amount,
       formattedPrice: booking.price,
       status: booking.status,
       bank: {
@@ -38,6 +39,124 @@ export const getBookingPaymentInfo = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Lỗi khi lấy thông tin thanh toán', error: error.message });
+  }
+};
+
+// Khách hàng bấm xác nhận thanh toán (sau khi quét VietQR / thanh toán ca)
+export const customerPayBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+    const booking = await Booking.findById(id);
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn dịch vụ' });
+    }
+
+    // Kiểm tra quyền sở hữu đơn
+    const isCustomer =
+      booking.customerEmail === user.email ||
+      booking.customerId?.toString() === user._id?.toString() ||
+      user.role === 'admin';
+
+    if (!isCustomer) {
+      return res.status(403).json({ message: 'Bạn không có quyền thanh toán cho đơn dịch vụ này' });
+    }
+
+    if (booking.status === 'COMPLETED') {
+      return res.status(400).json({ message: 'Đơn này đã được xác nhận thanh toán trước đó!' });
+    }
+
+    if (booking.status !== 'AWAITING_PAYMENT') {
+      return res.status(400).json({
+        message: `Đơn đang ở trạng thái "${booking.status}", chỉ có thể thanh toán khi ở trạng thái "Chờ thanh toán"!`,
+      });
+    }
+
+    // 1. Tính toán chiết khấu / thuế sàn và thu nhập thực nhận của người giúp việc
+    const feeRate =
+      booking.pricingSnapshot?.feeRate !== undefined
+        ? booking.pricingSnapshot.feeRate
+        : booking.assigneeType === 'ENTERPRISE'
+        ? 0.12
+        : 0.20;
+
+    const laborTotal = booking.pricingSnapshot?.laborTotal || booking.totalPrice || 0;
+    const advanceFee = booking.pricingSnapshot?.advanceFee || 0;
+    const platformFee = Math.round(laborTotal * feeRate);
+    const helperEarnings = (laborTotal - platformFee) + advanceFee;
+
+    // 2. Cập nhật đơn dịch vụ
+    booking.status = 'COMPLETED';
+    booking.statusColor = 'emerald';
+    booking.payoutStatus = 'Đã cộng vào ví';
+    booking.paidAt = new Date();
+    booking.paymentConfirmedBy = user._id;
+    booking.platformFee = platformFee;
+    booking.helperEarnings = helperEarnings;
+
+    if (!booking.pricingSnapshot) {
+      booking.pricingSnapshot = {};
+    }
+    booking.pricingSnapshot.feeRate = feeRate;
+    booking.pricingSnapshot.platformFee = platformFee;
+    booking.pricingSnapshot.helperEarnings = helperEarnings;
+
+    // 3. Quyết toán cộng tiền vào Ví của Assignee (Người giúp việc hoặc Doanh nghiệp)
+    if (booking.assigneeId) {
+      const assignee = await User.findById(booking.assigneeId);
+      if (assignee) {
+        if (!assignee.wallet) {
+          assignee.wallet = { available: 0, locked: 0 };
+        }
+        assignee.wallet.available = (assignee.wallet.available || 0) + helperEarnings;
+        await assignee.save();
+
+        // Ghi nhận lịch sử giao dịch ví (EARNING)
+        await WalletTransaction.create({
+          userId: assignee._id,
+          type: 'EARNING',
+          amount: helperEarnings,
+          bookingId: booking._id,
+          bookingCode: booking.bookingCode,
+          balanceAfter: assignee.wallet.available,
+          note: `Thu nhập ca làm việc #${booking.bookingCode} (${booking.service}) - Khách thanh toán, đã trừ phí sàn/thuế ${(feeRate * 100).toFixed(0)}% (-${platformFee.toLocaleString('vi-VN')}đ)`,
+        });
+
+        // Gửi thông báo cho người làm
+        await Notification.create({
+          userId: assignee._id,
+          title: 'Thu nhập đã vào ví!',
+          message: `Khách hàng ${user.name} đã thanh toán đơn #${booking.bookingCode}. Đã cộng +${helperEarnings.toLocaleString('vi-VN')}đ vào ví thu nhập của bạn (sau khi trừ phí sàn/thuế ${platformFee.toLocaleString('vi-VN')}đ).`,
+          type: 'PAYMENT',
+          link: assignee.role === 'enterprise' ? '/enterprise' : '/helper',
+        }).catch(() => {});
+      }
+    }
+
+    const saved = await booking.save();
+
+    // 4. Gửi thông báo cho khách hàng
+    if (booking.customerId) {
+      await Notification.create({
+        userId: booking.customerId,
+        title: 'Thanh toán thành công!',
+        message: `Đơn #${booking.bookingCode} đã thanh toán thành công số tiền ${booking.totalPrice?.toLocaleString('vi-VN')}đ. Cảm ơn bạn đã tin dùng GiúpViệc24! Hãy gửi đánh giá dịch vụ nhé.`,
+        type: 'PAYMENT',
+        link: '/customer',
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      message: `Thanh toán thành công! Đã giải ngân ${helperEarnings.toLocaleString('vi-VN')}đ (đã khấu trừ phí sàn/thuế) vào ví người giúp việc.`,
+      booking: saved,
+      helperEarnings,
+      platformFee,
+    });
+  } catch (error) {
+    console.error('Customer payment error:', error);
+    res.status(500).json({ message: 'Lỗi khi xử lý thanh toán', error: error.message });
   }
 };
 

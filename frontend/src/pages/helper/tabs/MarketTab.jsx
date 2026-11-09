@@ -3,8 +3,10 @@ import { Calendar, MapPin, Sparkles, CheckCircle, AlertTriangle, RefreshCw } fro
 import bookingApi from '../../../api/bookingApi';
 import authApi from '../../../api/authApi';
 import { formatVND } from '../../../utils/serviceUtils';
+import { useToast } from '../../../context/ToastContext';
 
 const MarketTab = ({ user, onJobAccepted, onNavigateToKyc }) => {
+  const { toast } = useToast();
   const [openBookings, setOpenBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
@@ -45,19 +47,19 @@ const MarketTab = ({ user, onJobAccepted, onNavigateToKyc }) => {
 
   const handleAccept = async (bookingId) => {
     if (!isLevel2) {
-      alert('Tài khoản Cấp 1 cần chờ Admin xác thực hồ sơ CCCD để bắt đầu nhận việc!');
+      toast.warning('Tài khoản Cấp 1 cần chờ Admin xác thực hồ sơ CCCD để bắt đầu nhận việc!');
       return;
     }
 
     setActionLoadingId(bookingId);
     try {
       await bookingApi.acceptBooking(bookingId);
-      alert('Nhận việc thành công! Ca làm việc đã được chuyển vào Lịch của bạn.');
+      toast.success('Nhận việc thành công! Ca làm việc đã được chuyển vào Lịch của bạn.');
       await fetchMarket();
       if (onJobAccepted) onJobAccepted();
     } catch (err) {
       const msg = err.response?.data?.message || 'Có lỗi xảy ra khi nhận việc!';
-      alert(msg);
+      toast.error(msg);
       await fetchMarket();
     } finally {
       setActionLoadingId(null);
@@ -68,11 +70,11 @@ const MarketTab = ({ user, onJobAccepted, onNavigateToKyc }) => {
     setActionLoadingId(bookingId);
     try {
       await bookingApi.respondInvite(bookingId, { action });
-      alert(action === 'accept' ? 'Đã nhận ca thành công!' : 'Đã từ chối lời mời.');
+      toast.success(action === 'accept' ? 'Đã nhận ca thành công!' : 'Đã từ chối lời mời.');
       await fetchMarket();
       if (action === 'accept' && onJobAccepted) onJobAccepted();
     } catch (err) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra khi phản hồi lời mời!');
+      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi phản hồi lời mời!');
       await fetchMarket();
     } finally {
       setActionLoadingId(null);

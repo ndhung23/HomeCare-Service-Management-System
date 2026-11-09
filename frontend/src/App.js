@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import Home from './pages/Home';
 import ServicesPage from './pages/ServicesPage';
 import HelpersPage from './pages/HelpersPage';
@@ -28,8 +29,9 @@ const ProfileRedirect = () => {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
           {/* Main Website Navigation Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/services" element={<ServicesPage />} />
@@ -85,7 +87,8 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
-    </AuthProvider>
+    </ToastProvider>
+  </AuthProvider>
   );
 }
 

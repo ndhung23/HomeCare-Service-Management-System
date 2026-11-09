@@ -15,8 +15,10 @@ import KycAndWorkersTab from './tabs/KycAndWorkersTab';
 import PaymentsAndWithdrawsTab from './tabs/PaymentsAndWithdrawsTab';
 import DisputesTab from './tabs/DisputesTab';
 import PricingAndContentTab from './tabs/PricingAndContentTab';
+import { useToast } from '../../context/ToastContext';
 
 const AdminDashboard = () => {
+  const { toast, confirm, prompt } = useToast();
   const [activeTab, setActiveTab] = useState('PAYMENT'); // 'PAYMENT' | 'KYC' | 'DISPUTES' | 'USERS' | 'PRICING'
   const [stats, setStats] = useState(null);
 
@@ -105,31 +107,48 @@ const AdminDashboard = () => {
   }, [userSearch, userRoleFilter]);
 
   const handleConfirmPayment = async (bookingId) => {
-    if (!window.confirm('Xác nhận đã nhận đủ tiền thanh toán cho đơn này?')) return;
+    const ok = await confirm({
+      title: 'Xác nhận thanh toán',
+      message: 'Xác nhận đã nhận đủ tiền chuyển khoản cho đơn này? Tiền công sẽ được giải ngân ngay vào ví của Người giúp việc.',
+      variant: 'primary',
+      confirmText: 'Xác nhận đã nhận tiền',
+      cancelText: 'Đóng',
+    });
+    if (!ok) return;
+
     setIsProcessingPayment(bookingId);
     try {
       await adminApi.confirmPayment(bookingId);
-      alert('Đã xác nhận thanh toán thành công! Tiền công đã được cộng vào ví của Người giúp việc.');
+      toast.success('Đã xác nhận thanh toán thành công! Tiền công đã được cộng vào ví của Người giúp việc.');
       fetchAwaitingPayments();
       fetchPaymentHistory();
       fetchStats();
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi khi xác nhận thanh toán');
+      toast.error(err.response?.data?.message || 'Lỗi khi xác nhận thanh toán');
     } finally {
       setIsProcessingPayment(null);
     }
   };
 
   const handleRejectPayment = async (bookingId) => {
-    const reason = window.prompt('Nhập lý do từ chối xác nhận thanh toán:', 'Chưa nhận được tiền vào tài khoản');
+    const reason = await prompt({
+      title: 'Từ chối thanh toán',
+      message: 'Vui lòng nhập lý do từ chối xác nhận thanh toán (sẽ thông báo tới khách hàng):',
+      placeholder: 'Ví dụ: Chưa nhận được tiền, số tiền không khớp...',
+      defaultValue: 'Chưa nhận được tiền vào tài khoản đối soát',
+      confirmText: 'Từ chối thanh toán',
+      cancelText: 'Đóng',
+      required: true,
+    });
     if (!reason) return;
+
     setIsProcessingPayment(bookingId);
     try {
       await adminApi.rejectPayment(bookingId, reason);
-      alert('Đã từ chối thanh toán và thông báo cho khách hàng.');
+      toast.warning('Đã từ chối thanh toán và thông báo cho khách hàng.');
       fetchAwaitingPayments();
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi khi từ chối thanh toán');
+      toast.error(err.response?.data?.message || 'Lỗi khi từ chối thanh toán');
     } finally {
       setIsProcessingPayment(null);
     }

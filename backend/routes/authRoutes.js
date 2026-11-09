@@ -6,6 +6,7 @@ import {
   getMe,
   addEmployee,
   updateProfile,
+  cancelProfileUpdateRequest,
   changePassword,
   updateAvailability,
   forgotPassword,
@@ -23,6 +24,7 @@ router.get('/me', protect, getMe);
 router.get('/users', getAllUsers);
 router.post('/employees', protect, addEmployee);
 router.put('/profile', protect, updateProfile);
+router.delete('/profile/pending-update', protect, cancelProfileUpdateRequest);
 router.put('/change-password', protect, changePassword);
 router.put('/availability', protect, updateAvailability);
 
