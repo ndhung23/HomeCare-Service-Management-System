@@ -39,21 +39,22 @@ const connectDB = async () => {
 
   try {
     await mongoose.connect(uri || 'mongodb://127.0.0.1:27017/homecare', {
-      serverSelectionTimeoutMS: 4000,
+      serverSelectionTimeoutMS: 5000,
     });
-    console.log('MongoDB connected successfully to homecare database');
+    console.log('MongoDB connected successfully');
   } catch (err) {
     console.error('MongoDB connection error:', err.message);
   }
 };
 
-// Lazy DB connect middleware
+// DB connect middleware - đảm bảo kết nối trước khi vào controllers
 app.use(async (req, res, next) => {
-  if (req.path === '/' || req.path === '/api/test' || req.path.includes('/payos-webhook')) {
-    connectDB().catch(() => {});
-    return next();
+  if (req.path === '/') return next();
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error('DB connect error:', err.message);
   }
-  await connectDB().catch(() => {});
   next();
 });
 
