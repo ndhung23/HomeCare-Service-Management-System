@@ -113,11 +113,13 @@ export const getBookingPaymentInfo = async (req, res) => {
     const amount = booking.totalPrice || 0;
     const addInfo = (booking.bookingCode || booking.code || `BK-${booking._id.toString().slice(-6)}`).replace(/[^a-zA-Z0-9]/g, '');
 
-    // Tạo mã số thứ tự đơn hàng nguyên dương cho PayOS
-    const numericOrderCode = parseInt(addInfo.replace(/\D/g, '')) || Math.floor(Date.now() / 1000);
+    // Tạo mã số thứ tự đơn hàng nguyên dương ngẫu nhiên duy nhất cho PayOS
+    const numericOrderCode = Number(`${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 90 + 10)}`);
 
+    let bankAccountNo = '4661398013';
+    let bankAccountName = 'NGUYEN DUY HUNG';
     let transferContent = addInfo;
-    let qrUrl = `https://img.vietqr.io/image/970418-${accountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(addInfo)}&accountName=${encodeURIComponent(accountName)}`;
+    let qrUrl = `https://img.vietqr.io/image/970418-${bankAccountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(addInfo)}&accountName=${encodeURIComponent(bankAccountName)}`;
     let checkoutUrl = null;
     let payosQr = null;
 
@@ -134,11 +136,22 @@ export const getBookingPaymentInfo = async (req, res) => {
       if (payosRes) {
         checkoutUrl = payosRes.checkoutUrl;
         payosQr = payosRes.qrCode;
-        // Sử dụng chính xác nội dung chuyển khoản mà PayOS yêu cầu để hệ thống PayOS khớp tự động 100%
-        if (payosRes.description) {
-          transferContent = payosRes.description;
-          qrUrl = `https://img.vietqr.io/image/970418-${accountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(payosRes.description)}&accountName=${encodeURIComponent(accountName)}`;
+
+        if (payosRes.accountNumber) bankAccountNo = payosRes.accountNumber;
+        if (payosRes.accountName) bankAccountName = payosRes.accountName;
+        // Sử dụng chính xác nội dung chuyển khoản mà PayOS yêu cầu để khớp tự động 100%
+        if (payosRes.description) transferContent = payosRes.description;
+
+        // Ưu tiên tạo ảnh QR trực tiếp từ chuỗi chuẩn VietQR PayOS
+        if (payosRes.qrCode) {
+          qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(payosRes.qrCode)}`;
+        } else if (payosRes.description) {
+          qrUrl = `https://img.vietqr.io/image/970418-${bankAccountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(payosRes.description)}&accountName=${encodeURIComponent(bankAccountName)}`;
         }
+
+        // Lưu payosOrderCode vào booking để webhook đối soát chuẩn xác
+        booking.payosOrderCode = numericOrderCode;
+        await booking.save().catch(() => {});
       }
     } catch (payosErr) {
       console.log('PayOS link create note:', payosErr.message);
@@ -154,8 +167,8 @@ export const getBookingPaymentInfo = async (req, res) => {
       status: booking.status,
       bank: {
         bankId,
-        accountNo,
-        accountName,
+        accountNo: bankAccountNo,
+        accountName: bankAccountName,
       },
       transferContent,
       qrUrl,
@@ -251,6 +264,9 @@ export const handlePayOSWebhook = async (req, res) => {
 
     const queryConditions = [];
     if (orderStr) {
+      if (!isNaN(Number(orderStr))) {
+        queryConditions.push({ payosOrderCode: Number(orderStr) });
+      }
       queryConditions.push({ code: new RegExp(orderStr, 'i') });
       queryConditions.push({ bookingCode: new RegExp(orderStr, 'i') });
     }

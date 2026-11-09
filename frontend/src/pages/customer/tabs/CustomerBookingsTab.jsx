@@ -625,14 +625,33 @@ const CustomerBookingsTab = ({ bookings, isLoading, fetchBookings }) => {
               <p className="text-[11px] text-slate-500 mt-2 font-medium">Quét mã bằng app ngân hàng bất kỳ để chuyển khoản</p>
             </div>
 
-            <div className="space-y-1">
-              <p className="text-xs text-slate-500 font-semibold">Tổng tiền thanh toán</p>
-              <p className="text-2xl font-black text-emerald-600">
-                {formatVND(paymentModalData.totalPrice || paymentModalData.amount)}
-              </p>
-              <p className="text-xs text-slate-600">
-                Nội dung CK: <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">{paymentModalData.transferContent || paymentModalData.bookingCode}</span>
-              </p>
+            <div className="space-y-1.5 text-left bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-slate-500 font-semibold">Tổng tiền thanh toán:</span>
+                <span className="text-xl font-black text-emerald-600">
+                  {formatVND(paymentModalData.totalPrice || paymentModalData.amount)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs text-slate-600">
+                <span>Ngân hàng:</span>
+                <span className="font-bold text-slate-900">{paymentModalData.bank?.bankId || 'BIDV'}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs text-slate-600">
+                <span>Số tài khoản:</span>
+                <span className="font-bold text-slate-900 bg-white border border-slate-200 px-1.5 py-0.5 rounded select-all font-mono">
+                  {paymentModalData.bank?.accountNo || '4661398013'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs text-slate-600">
+                <span>Chủ tài khoản:</span>
+                <span className="font-bold text-slate-900">{paymentModalData.bank?.accountName || 'NGUYEN DUY HUNG'}</span>
+              </div>
+              <div className="pt-1.5 border-t border-slate-200 text-xs">
+                <span className="text-slate-500 block mb-0.5 text-[11px]">Nội dung chuyển khoản (bắt buộc đúng để tự động khớp):</span>
+                <span className="font-black text-amber-950 bg-amber-100 border border-amber-300 px-2 py-1 rounded select-all block text-center font-mono tracking-wide text-xs">
+                  {paymentModalData.transferContent || paymentModalData.bookingCode}
+                </span>
+              </div>
               <div className="pt-1 flex items-center justify-center gap-1.5 text-[11px] text-blue-600 font-medium">
                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
                 <span>Đang tự động nhận diện giao dịch ngân hàng...</span>
