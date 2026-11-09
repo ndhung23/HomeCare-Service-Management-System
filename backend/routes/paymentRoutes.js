@@ -9,7 +9,8 @@ import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Webhook từ PayOS (không dùng middleware protect vì PayOS server gọi vào)
+// Webhook từ PayOS (hỗ trợ cả GET kiểm tra URL và POST nhận dữ liệu giao dịch)
+router.get('/payos-webhook', (req, res) => res.status(200).send('PayOS Webhook endpoint is active and ready!'));
 router.post('/payos-webhook', handlePayOSWebhook);
 
 // Kiểm tra trạng thái đơn hàng (cho frontend polling)

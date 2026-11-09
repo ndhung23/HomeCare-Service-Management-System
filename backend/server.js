@@ -23,7 +23,58 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-// Routes
+// Connect MongoDB with caching for serverless
+const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) return;
+  const uri = process.env.MONGO_URI;
+
+  if (!uri || uri.includes('127.0.0.1')) {
+    if (process.env.VERCEL) {
+      console.warn('⚠️ VERCEL: MONGO_URI is not configured in Vercel Environment Variables. Set it in Vercel Settings -> Environment Variables.');
+      return;
+    }
+  }
+
+  try {
+    await mongoose.connect(uri || 'mongodb://127.0.0.1:27017/homecare', {
+      serverSelectionTimeoutMS: 4000,
+    });
+    console.log('MongoDB connected successfully to homecare database');
+  } catch (err) {
+    console.error('MongoDB connection error:', err.message);
+  }
+};
+
+// Lazy DB connect middleware
+app.use(async (req, res, next) => {
+  if (req.path === '/' || req.path === '/api/test' || req.path.includes('/payos-webhook')) {
+    connectDB().catch(() => {});
+    return next();
+  }
+  await connectDB().catch(() => {});
+  next();
+});
+
+// Root Healthcheck endpoints (luôn phản hồi 200)
+app.get('/', (req, res) => {
+  res.status(200).send('HomeCare Service Management API is running on Vercel!');
+});
+
+app.get('/api', (req, res) => {
+  res.status(200).json({ status: 'online', service: 'GiupViec24 Backend', time: new Date() });
+});
+
+app.get('/api/test', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'API Backend is running!',
+    mongoStatus: mongoose.connection.readyState === 1 ? 'CONNECTED' : 'DISCONNECTED / CONNECTING',
+    nodeEnv: process.env.NODE_ENV,
+    isVercel: Boolean(process.env.VERCEL),
+  });
+});
+
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/workers', workerRoutes);
@@ -38,19 +89,9 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/disputes', disputeRoutes);
 
-app.get('/api/test', (req, res) => {
-  res.json({ message: 'API Backend is running and connected to MongoDB!' });
-});
-
-// Connect MongoDB
-mongoose
-  .connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/homecare')
-  .then(() => {
-    console.log('MongoDB connected successfully to homecare database');
-  })
-  .catch((err) => console.error('MongoDB connection error:', err));
-
+// Khởi chạy server khi chạy ở môi trường local
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  connectDB().catch(() => {});
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
