@@ -1,6 +1,7 @@
 import pkg from '@payos/node';
 import dotenv from 'dotenv';
 dotenv.config();
+dotenv.config({ path: './backend/.env' });
 
 const PayOS = pkg.PayOS || pkg.default?.PayOS || pkg;
 

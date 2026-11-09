@@ -1,4 +1,6 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config();
+dotenv.config({ path: './backend/.env' });
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
@@ -89,8 +91,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/disputes', disputeRoutes);
 
-// Khởi chạy server khi chạy ở môi trường local
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+// Khởi chạy server khi chạy ở môi trường local / VPS (không chạy trên Vercel Serverless)
+if (!process.env.VERCEL) {
   connectDB().catch(() => {});
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
