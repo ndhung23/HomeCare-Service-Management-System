@@ -257,23 +257,23 @@ export const handlePayOSWebhook = async (req, res) => {
     // 2. Tìm đơn hàng qua orderCode hoặc description chuyển khoản (ví dụ: BK443078 / BK-443078)
     const orderStr = orderCode ? orderCode.toString() : '';
     const desc = (description || webhookBody?.data?.description || '').toString();
-    const descNumbers = desc.replace(/\D/g, '');
-    const descMatches = desc.match(/BK[-]?\d+/i);
-    const bkRaw = descMatches ? descMatches[0] : '';
-    const bkFormatted = bkRaw ? bkRaw.replace(/^BK/i, 'BK-').replace('BK--', 'BK-') : '';
+    const bkMatch = desc.match(/BK[-]?(\d+)/i);
 
     const queryConditions = [];
     if (orderStr) {
       if (!isNaN(Number(orderStr))) {
         queryConditions.push({ payosOrderCode: Number(orderStr) });
       }
-      queryConditions.push({ code: new RegExp(orderStr, 'i') });
       queryConditions.push({ bookingCode: new RegExp(orderStr, 'i') });
     }
-    if (descNumbers && descNumbers.length >= 4) {
-      queryConditions.push({ code: new RegExp(descNumbers, 'i') });
-      queryConditions.push({ bookingCode: new RegExp(descNumbers, 'i') });
+    if (bkMatch) {
+      const digits = bkMatch[1];
+      queryConditions.push({ bookingCode: `BK-${digits}` });
+      queryConditions.push({ bookingCode: new RegExp(`BK-?${digits}`, 'i') });
     }
+    const descMatches = desc.match(/BK[-]?\d+/i);
+    const bkRaw = descMatches ? descMatches[0] : '';
+    const bkFormatted = bkRaw ? bkRaw.replace(/^BK/i, 'BK-').replace('BK--', 'BK-') : '';
     if (bkRaw) {
       queryConditions.push({ bookingCode: new RegExp(bkRaw.replace('-', ''), 'i') });
     }

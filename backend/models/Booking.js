@@ -168,6 +168,15 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    paymentMethod: {
+      type: String,
+      default: '',
+    },
+    payosOrderCode: {
+      type: Number,
+      default: null,
+      index: true,
+    },
     payoutStatus: {
       type: String,
       enum: ['Chờ quyết toán', 'Đã cộng vào ví', 'Đã thanh toán'],
